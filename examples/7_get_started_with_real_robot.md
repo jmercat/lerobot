@@ -158,7 +158,7 @@ robot_type: koch
 leader_arms:
   main:
     _target_: lerobot.common.robot_devices.motors.dynamixel.DynamixelMotorsBus
-    port: /dev/tty.usbmodem575E0031751  # <- Update
+    port: /dev/cu.usbmodem585A0085581  # <- Update
     motors:
       # name: (index, model)
       shoulder_pan: [1, "xl330-m077"]
@@ -170,7 +170,7 @@ leader_arms:
 follower_arms:
   main:
     _target_: lerobot.common.robot_devices.motors.dynamixel.DynamixelMotorsBus
-    port: /dev/tty.usbmodem575E0032081  # <- Update
+    port: /dev/cu.usbmodem585A0085371  # <- Update
     motors:
       # name: (index, model)
       shoulder_pan: [1, "xl430-w250"]

@@ -20,7 +20,10 @@ from dynamixel_sdk import (
     PortHandler,
 )
 
-from lerobot.common.robot_devices.utils import RobotDeviceAlreadyConnectedError, RobotDeviceNotConnectedError
+from lerobot.common.robot_devices.utils import (
+    RobotDeviceAlreadyConnectedError,
+    RobotDeviceNotConnectedError,
+)
 from lerobot.common.utils.utils import capture_timestamp_utc
 
 PROTOCOL_VERSION = 2.0
@@ -155,7 +158,9 @@ NUM_READ_RETRY = 10
 NUM_WRITE_RETRY = 10
 
 
-def convert_degrees_to_steps(degrees: float | np.ndarray, models: str | list[str]) -> np.ndarray:
+def convert_degrees_to_steps(
+    degrees: float | np.ndarray, models: str | list[str]
+) -> np.ndarray:
     """This function converts the degree range to the step range for indicating motors rotation.
     It assumes a motor achieves a full rotation by going from -180 degree position to +180.
     The motor resolution (e.g. 4096) corresponds to the number of steps needed to achieve a full rotation.
@@ -247,7 +252,9 @@ def find_port():
     ports_before = find_available_ports()
     print(ports_before)
 
-    print("Remove the usb cable from your DynamixelMotorsBus and press Enter when done.")
+    print(
+        "Remove the usb cable from your DynamixelMotorsBus and press Enter when done."
+    )
     input()
 
     time.sleep(0.5)
@@ -259,9 +266,13 @@ def find_port():
         print(f"The port of this DynamixelMotorsBus is '{port}'")
         print("Reconnect the usb cable.")
     elif len(ports_diff) == 0:
-        raise OSError(f"Could not detect the port. No difference was found ({ports_diff}).")
+        raise OSError(
+            f"Could not detect the port. No difference was found ({ports_diff})."
+        )
     else:
-        raise OSError(f"Could not detect the port. More than one port was found ({ports_diff}).")
+        raise OSError(
+            f"Could not detect the port. More than one port was found ({ports_diff})."
+        )
 
 
 class TorqueMode(enum.Enum):
@@ -423,8 +434,12 @@ class DynamixelMotorsBus:
         print()
 
         possible_baudrates = list(ids_per_baudrate.keys())
-        possible_ids = list({idx for sublist in ids_per_baudrate.values() for idx in sublist})
-        untaken_ids = list(set(range(MAX_ID_RANGE)) - set(possible_ids) - set(self.motor_indices))
+        possible_ids = list(
+            {idx for sublist in ids_per_baudrate.values() for idx in sublist}
+        )
+        untaken_ids = list(
+            set(range(MAX_ID_RANGE)) - set(possible_ids) - set(self.motor_indices)
+        )
 
         # Connect successively one motor to the chain and write a unique random index for each
         for i in range(len(self.motors)):
@@ -437,69 +452,92 @@ class DynamixelMotorsBus:
                 "Press Enter to continue..."
             )
             print()
-            self.reconnect()
 
-            if i > 0:
-                try:
-                    self._read_with_motor_ids(self.motor_models, untaken_ids[:i], "ID")
-                except ConnectionError:
-                    print(f"Failed to read from {untaken_ids[:i+1]}. Make sure the power cord is plugged in.")
-                    input("Press Enter to continue...")
-                    print()
-                    self.reconnect()
+            connected = False
+            while not connected:
+                self.reconnect()
+                if i > 0:
+                    try:
+                        self._read_with_motor_ids(
+                            self.motor_models, untaken_ids[:i], "ID"
+                        )
+                        connected = True
+                    except ConnectionError:
+                        print(
+                            f"Failed to read from {untaken_ids[:i+1]}. Make sure the power cord is plugged in."
+                        )
+                        input("Press Enter to continue...")
+                        print()
+                else:
+                    connected = True
 
             print("Scanning possible baudrates and motor indices")
             motor_found = False
-            for baudrate in possible_baudrates:
-                self.set_bus_baudrate(baudrate)
-                present_ids = self.find_motor_indices(possible_ids)
-                if len(present_ids) == 1:
-                    present_idx = present_ids[0]
-                    print(f"Detected motor with index {present_idx}")
+            while not motor_found:
+                for baudrate in possible_baudrates:
+                    self.set_bus_baudrate(baudrate)
+                    present_ids = self.find_motor_indices(possible_ids)
+                    if len(present_ids) == 1:
+                        present_idx = present_ids[0]
+                        print(f"Detected motor with index {present_idx}")
 
-                    if baudrate != BAUDRATE:
-                        print(f"Setting its baudrate to {BAUDRATE}")
-                        baudrate_idx = list(X_SERIES_BAUDRATE_TABLE.values()).index(BAUDRATE)
-
-                        # The write can fail, so we allow retries
-                        for _ in range(NUM_WRITE_RETRY):
-                            self._write_with_motor_ids(
-                                self.motor_models, present_idx, "Baud_Rate", baudrate_idx
+                        if baudrate != BAUDRATE:
+                            print(f"Setting its baudrate to {BAUDRATE}")
+                            baudrate_idx = list(X_SERIES_BAUDRATE_TABLE.values()).index(
+                                BAUDRATE
                             )
-                            time.sleep(0.5)
-                            self.set_bus_baudrate(BAUDRATE)
-                            try:
-                                present_baudrate_idx = self._read_with_motor_ids(
-                                    self.motor_models, present_idx, "Baud_Rate"
+
+                            # The write can fail, so we allow retries
+                            for _ in range(NUM_WRITE_RETRY):
+                                self._write_with_motor_ids(
+                                    self.motor_models,
+                                    present_idx,
+                                    "Baud_Rate",
+                                    baudrate_idx,
                                 )
-                            except ConnectionError:
-                                print("Failed to write baudrate. Retrying.")
-                                self.set_bus_baudrate(baudrate)
-                                continue
-                            break
-                        else:
-                            raise
+                                time.sleep(0.5)
+                                self.set_bus_baudrate(BAUDRATE)
+                                try:
+                                    present_baudrate_idx = self._read_with_motor_ids(
+                                        self.motor_models, present_idx, "Baud_Rate"
+                                    )
+                                except ConnectionError:
+                                    print("Failed to write baudrate. Retrying.")
+                                    self.set_bus_baudrate(baudrate)
+                                    continue
+                                break
+                            else:
+                                raise
 
-                        if present_baudrate_idx != baudrate_idx:
-                            raise OSError("Failed to write baudrate.")
+                            if present_baudrate_idx != baudrate_idx:
+                                raise OSError("Failed to write baudrate.")
 
-                    print(f"Setting its index to a temporary untaken index ({untaken_ids[i]})")
-                    self._write_with_motor_ids(self.motor_models, present_idx, "ID", untaken_ids[i])
+                        print(
+                            f"Setting its index to a temporary untaken index ({untaken_ids[i]})"
+                        )
+                        self._write_with_motor_ids(
+                            self.motor_models, present_idx, "ID", untaken_ids[i]
+                        )
 
-                    present_idx = self._read_with_motor_ids(self.motor_models, untaken_ids[i], "ID")
-                    if present_idx != untaken_ids[i]:
-                        raise OSError("Failed to write index.")
+                        present_idx = self._read_with_motor_ids(
+                            self.motor_models, untaken_ids[i], "ID"
+                        )
+                        if present_idx != untaken_ids[i]:
+                            raise OSError("Failed to write index.")
 
-                    motor_found = True
-                    break
-                elif len(present_ids) > 1:
-                    raise OSError(f"More than one motor detected ({present_ids}), but only one was expected.")
+                        motor_found = True
+                        break
+                    elif len(present_ids) > 1:
+                        raise OSError(
+                            f"More than one motor detected ({present_ids}), but only one was expected."
+                        )
 
-            if not motor_found:
-                raise OSError(
-                    "No motor found, but one new motor expected. Verify power cord is plugged in and retry."
-                )
-            print()
+                if not motor_found:
+                    print(
+                        "No motor found, but one new motor expected. Verify power cord is plugged in and retry."
+                    )
+                    input("Press Enter to continue...")
+                    print()
 
         print(f"Setting expected motor indices: {self.motor_indices}")
         self.set_bus_baudrate(BAUDRATE)
@@ -520,7 +558,9 @@ class DynamixelMotorsBus:
         indices = []
         for idx in tqdm.tqdm(possible_ids):
             try:
-                present_idx = self._read_with_motor_ids(self.motor_models, [idx], "ID")[0]
+                present_idx = self._read_with_motor_ids(self.motor_models, [idx], "ID")[
+                    0
+                ]
             except ConnectionError:
                 continue
 
@@ -530,13 +570,16 @@ class DynamixelMotorsBus:
                     "Motor index used to communicate through the bus is not the same as the one present in the motor memory. The motor memory might be damaged."
                 )
             indices.append(idx)
-
+        if len(indices) == 0:
+            print("No motor detected.")
         return indices
 
     def set_bus_baudrate(self, baudrate):
         present_bus_baudrate = self.port_handler.getBaudRate()
         if present_bus_baudrate != baudrate:
-            print(f"Setting bus baud rate to {baudrate}. Previously {present_bus_baudrate}.")
+            print(
+                f"Setting bus baud rate to {baudrate}. Previously {present_bus_baudrate}."
+            )
             self.port_handler.setBaudRate(baudrate)
 
             if self.port_handler.getBaudRate() != baudrate:
@@ -557,7 +600,9 @@ class DynamixelMotorsBus:
     def set_calibration(self, calibration: dict[str, list]):
         self.calibration = calibration
 
-    def apply_calibration_autocorrect(self, values: np.ndarray | list, motor_names: list[str] | None):
+    def apply_calibration_autocorrect(
+        self, values: np.ndarray | list, motor_names: list[str] | None
+    ):
         """This function applies the calibration, automatically detects out of range errors for motors values and attempts to correct.
 
         For more info, see docstring of `apply_calibration` and `autocorrect_calibration`.
@@ -570,7 +615,9 @@ class DynamixelMotorsBus:
             values = self.apply_calibration(values, motor_names)
         return values
 
-    def apply_calibration(self, values: np.ndarray | list, motor_names: list[str] | None):
+    def apply_calibration(
+        self, values: np.ndarray | list, motor_names: list[str] | None
+    ):
         """Convert from unsigned int32 joint position range [0, 2**32[ to the universal float32 nominal degree range ]-180.0, 180.0[ with
         a "zero position" at 0 degree.
 
@@ -645,7 +692,9 @@ class DynamixelMotorsBus:
 
         return values
 
-    def autocorrect_calibration(self, values: np.ndarray | list, motor_names: list[str] | None):
+    def autocorrect_calibration(
+        self, values: np.ndarray | list, motor_names: list[str] | None
+    ):
         """This function automatically detects issues with values of motors after calibration, and correct for these issues.
 
         Some motors might have values outside of expected maximum bounds after calibration.
@@ -687,15 +736,23 @@ class DynamixelMotorsBus:
                     values[i] *= -1
 
                 # Convert from initial range to range [-180, 180] degrees
-                calib_val = (values[i] + homing_offset) / (resolution // 2) * HALF_TURN_DEGREE
-                in_range = (calib_val > LOWER_BOUND_DEGREE) and (calib_val < UPPER_BOUND_DEGREE)
+                calib_val = (
+                    (values[i] + homing_offset) / (resolution // 2) * HALF_TURN_DEGREE
+                )
+                in_range = (calib_val > LOWER_BOUND_DEGREE) and (
+                    calib_val < UPPER_BOUND_DEGREE
+                )
 
                 # Solve this inequality to find the factor to shift the range into [-180, 180] degrees
                 # values[i] = (values[i] + homing_offset + resolution * factor) / (resolution // 2) * HALF_TURN_DEGREE
                 # - HALF_TURN_DEGREE <= (values[i] + homing_offset + resolution * factor) / (resolution // 2) * HALF_TURN_DEGREE <= HALF_TURN_DEGREE
                 # (- (resolution // 2) - values[i] - homing_offset) / resolution <= factor <= ((resolution // 2) - values[i] - homing_offset) / resolution
-                low_factor = (-(resolution // 2) - values[i] - homing_offset) / resolution
-                upp_factor = ((resolution // 2) - values[i] - homing_offset) / resolution
+                low_factor = (
+                    -(resolution // 2) - values[i] - homing_offset
+                ) / resolution
+                upp_factor = (
+                    (resolution // 2) - values[i] - homing_offset
+                ) / resolution
 
             elif CalibrationMode[calib_mode] == CalibrationMode.LINEAR:
                 start_pos = self.calibration["start_pos"][calib_idx]
@@ -703,7 +760,9 @@ class DynamixelMotorsBus:
 
                 # Convert from initial range to range [0, 100] in %
                 calib_val = (values[i] - start_pos) / (end_pos - start_pos) * 100
-                in_range = (calib_val > LOWER_BOUND_LINEAR) and (calib_val < UPPER_BOUND_LINEAR)
+                in_range = (calib_val > LOWER_BOUND_LINEAR) and (
+                    calib_val < UPPER_BOUND_LINEAR
+                )
 
                 # Solve this inequality to find the factor to shift the range into [0, 100] %
                 # values[i] = (values[i] - start_pos + resolution * factor) / (end_pos + resolution * factor - start_pos - resolution * factor) * 100
@@ -719,19 +778,27 @@ class DynamixelMotorsBus:
                     factor = math.ceil(low_factor)
 
                     if factor > upp_factor:
-                        raise ValueError(f"No integer found between bounds [{low_factor=}, {upp_factor=}]")
+                        raise ValueError(
+                            f"No integer found between bounds [{low_factor=}, {upp_factor=}]"
+                        )
                 else:
                     factor = math.ceil(upp_factor)
 
                     if factor > low_factor:
-                        raise ValueError(f"No integer found between bounds [{low_factor=}, {upp_factor=}]")
+                        raise ValueError(
+                            f"No integer found between bounds [{low_factor=}, {upp_factor=}]"
+                        )
 
                 if CalibrationMode[calib_mode] == CalibrationMode.DEGREE:
                     out_of_range_str = f"{LOWER_BOUND_DEGREE} < {calib_val} < {UPPER_BOUND_DEGREE} degrees"
                     in_range_str = f"{LOWER_BOUND_DEGREE} < {calib_val} < {UPPER_BOUND_DEGREE} degrees"
                 elif CalibrationMode[calib_mode] == CalibrationMode.LINEAR:
-                    out_of_range_str = f"{LOWER_BOUND_LINEAR} < {calib_val} < {UPPER_BOUND_LINEAR} %"
-                    in_range_str = f"{LOWER_BOUND_LINEAR} < {calib_val} < {UPPER_BOUND_LINEAR} %"
+                    out_of_range_str = (
+                        f"{LOWER_BOUND_LINEAR} < {calib_val} < {UPPER_BOUND_LINEAR} %"
+                    )
+                    in_range_str = (
+                        f"{LOWER_BOUND_LINEAR} < {calib_val} < {UPPER_BOUND_LINEAR} %"
+                    )
 
                 logging.warning(
                     f"Auto-correct calibration of motor '{name}' by shifting value by {abs(factor)} full turns, "
@@ -741,7 +808,9 @@ class DynamixelMotorsBus:
                 # A full turn corresponds to 360 degrees but also to 4096 steps for a motor resolution of 4096.
                 self.calibration["homing_offset"][calib_idx] += resolution * factor
 
-    def revert_calibration(self, values: np.ndarray | list, motor_names: list[str] | None):
+    def revert_calibration(
+        self, values: np.ndarray | list, motor_names: list[str] | None
+    ):
         """Inverse of `apply_calibration`."""
         if motor_names is None:
             motor_names = self.motor_names
@@ -836,7 +905,9 @@ class DynamixelMotorsBus:
 
         if data_name not in self.group_readers:
             # create new group reader
-            self.group_readers[group_key] = GroupSyncRead(self.port_handler, self.packet_handler, addr, bytes)
+            self.group_readers[group_key] = GroupSyncRead(
+                self.port_handler, self.packet_handler, addr, bytes
+            )
             for idx in motor_ids:
                 self.group_readers[group_key].addParam(idx)
 
@@ -866,7 +937,9 @@ class DynamixelMotorsBus:
             values = self.apply_calibration_autocorrect(values, motor_names)
 
         # log the number of seconds it took to read the data from the motors
-        delta_ts_name = get_log_name("delta_timestamp_s", "read", data_name, motor_names)
+        delta_ts_name = get_log_name(
+            "delta_timestamp_s", "read", data_name, motor_names
+        )
         self.logs[delta_ts_name] = time.perf_counter() - start_time
 
         # log the utc time at which the data was received
@@ -895,7 +968,12 @@ class DynamixelMotorsBus:
                 f"{self.packet_handler.getTxRxResult(comm)}"
             )
 
-    def write(self, data_name, values: int | float | np.ndarray, motor_names: str | list[str] | None = None):
+    def write(
+        self,
+        data_name,
+        values: int | float | np.ndarray,
+        motor_names: str | list[str] | None = None,
+    ):
         if not self.is_connected:
             raise RobotDeviceNotConnectedError(
                 f"DynamixelMotorsBus({self.port}) is not connected. You need to run `motors_bus.connect()`."
@@ -951,7 +1029,9 @@ class DynamixelMotorsBus:
             )
 
         # log the number of seconds it took to write the data to the motors
-        delta_ts_name = get_log_name("delta_timestamp_s", "write", data_name, motor_names)
+        delta_ts_name = get_log_name(
+            "delta_timestamp_s", "write", data_name, motor_names
+        )
         self.logs[delta_ts_name] = time.perf_counter() - start_time
 
         # TODO(rcadene): should we log the time before sending the write command?

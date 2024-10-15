@@ -122,14 +122,22 @@ from termcolor import colored
 from lerobot.common.datasets.compute_stats import compute_stats
 from lerobot.common.datasets.lerobot_dataset import CODEBASE_VERSION, LeRobotDataset
 from lerobot.common.datasets.push_dataset_to_hub.aloha_hdf5_format import to_hf_dataset
-from lerobot.common.datasets.push_dataset_to_hub.utils import concatenate_episodes, get_default_encoding
+from lerobot.common.datasets.push_dataset_to_hub.utils import (
+    concatenate_episodes,
+    get_default_encoding,
+)
 from lerobot.common.datasets.utils import calculate_episode_data_index, create_branch
 from lerobot.common.datasets.video_utils import encode_video_frames
 from lerobot.common.policies.factory import make_policy
 from lerobot.common.robot_devices.robots.factory import make_robot
 from lerobot.common.robot_devices.robots.utils import Robot, get_arm_id
 from lerobot.common.robot_devices.utils import busy_wait
-from lerobot.common.utils.utils import get_safe_torch_device, init_hydra_config, init_logging, set_global_seed
+from lerobot.common.utils.utils import (
+    get_safe_torch_device,
+    init_hydra_config,
+    init_logging,
+    set_global_seed,
+)
 from lerobot.scripts.eval import get_pretrained_policy_path
 from lerobot.scripts.push_dataset_to_hub import (
     push_dataset_card_to_hub,
@@ -165,7 +173,11 @@ def say(text, blocking=False):
 
 def save_image(img_tensor, key, frame_index, episode_index, videos_dir):
     img = Image.fromarray(img_tensor.numpy())
-    path = videos_dir / f"{key}_episode_{episode_index:06d}" / f"frame_{frame_index:06d}.png"
+    path = (
+        videos_dir
+        / f"{key}_episode_{episode_index:06d}"
+        / f"frame_{frame_index:06d}.png"
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(str(path), quality=100)
 
@@ -270,8 +282,9 @@ def calibrate(robot: Robot, arms: list[str] | None):
     for arm_id in arms:
         arm_calib_path = robot.calibration_dir / f"{arm_id}.json"
         if arm_calib_path.exists():
-            print(f"Removing '{arm_calib_path}'")
-            arm_calib_path.unlink()
+            answer = input(f"Do you want to remove '{arm_calib_path}'? [y/n]")
+            if answer.lower() == "y":
+                arm_calib_path.unlink()
         else:
             print(f"Calibration file not found '{arm_calib_path}'")
 
@@ -285,7 +298,9 @@ def calibrate(robot: Robot, arms: list[str] | None):
     print("Calibration is done! You can now teleoperate and record datasets!")
 
 
-def teleoperate(robot: Robot, fps: int | None = None, teleop_time_s: float | None = None):
+def teleoperate(
+    robot: Robot, fps: int | None = None, teleop_time_s: float | None = None
+):
     # TODO(rcadene): Add option to record logs
     if not robot.is_connected:
         robot.connect()
@@ -302,7 +317,10 @@ def teleoperate(robot: Robot, fps: int | None = None, teleop_time_s: float | Non
         dt_s = time.perf_counter() - start_loop_t
         log_control_info(robot, dt_s, fps=fps)
 
-        if teleop_time_s is not None and time.perf_counter() - start_teleop_t > teleop_time_s:
+        if (
+            teleop_time_s is not None
+            and time.perf_counter() - start_teleop_t > teleop_time_s
+        ):
             break
 
 
@@ -381,7 +399,9 @@ def record(
                     print("Right arrow key pressed. Exiting loop...")
                     exit_early = True
                 elif key == keyboard.Key.left:
-                    print("Left arrow key pressed. Exiting loop and rerecord the last episode...")
+                    print(
+                        "Left arrow key pressed. Exiting loop and rerecord the last episode..."
+                    )
                     rerecord_episode = True
                     exit_early = True
                 elif key == keyboard.Key.esc:
@@ -430,7 +450,9 @@ def record(
         if not is_headless():
             image_keys = [key for key in observation if "image" in key]
             for key in image_keys:
-                cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+                cv2.imshow(
+                    key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR)
+                )
             cv2.waitKey(1)
 
         dt_s = time.perf_counter() - start_loop_t
@@ -445,7 +467,9 @@ def record(
     # Using `with` to exist smoothly if an execption is raised.
     futures = []
     num_image_writers = num_image_writers_per_camera * len(robot.cameras)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_image_writers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=num_image_writers
+    ) as executor:
         # Start recording all episodes
         while episode_index < num_episodes:
             logging.info(f"Recording episode {episode_index}")
@@ -468,14 +492,22 @@ def record(
                 for key in image_keys:
                     futures += [
                         executor.submit(
-                            save_image, observation[key], key, frame_index, episode_index, videos_dir
+                            save_image,
+                            observation[key],
+                            key,
+                            frame_index,
+                            episode_index,
+                            videos_dir,
                         )
                     ]
 
                 if not is_headless():
                     image_keys = [key for key in observation if "image" in key]
                     for key in image_keys:
-                        cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+                        cv2.imshow(
+                            key,
+                            cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR),
+                        )
                     cv2.waitKey(1)
 
                 for key in not_image_keys:
@@ -486,15 +518,21 @@ def record(
                 if policy is not None:
                     with (
                         torch.inference_mode(),
-                        torch.autocast(device_type=device.type)
-                        if device.type == "cuda" and hydra_cfg.use_amp
-                        else nullcontext(),
+                        (
+                            torch.autocast(device_type=device.type)
+                            if device.type == "cuda" and hydra_cfg.use_amp
+                            else nullcontext()
+                        ),
                     ):
                         # Convert to pytorch format: channel first and float32 in [0,1] with batch dimension
                         for name in observation:
                             if "image" in name:
-                                observation[name] = observation[name].type(torch.float32) / 255
-                                observation[name] = observation[name].permute(2, 0, 1).contiguous()
+                                observation[name] = (
+                                    observation[name].type(torch.float32) / 255
+                                )
+                                observation[name] = (
+                                    observation[name].permute(2, 0, 1).contiguous()
+                                )
                             observation[name] = observation[name].unsqueeze(0)
                             observation[name] = observation[name].to(device)
 
@@ -553,7 +591,9 @@ def record(
                 # Store the reference to the video frame, even tho the videos are not yet encoded
                 ep_dict[key] = []
                 for i in range(num_frames):
-                    ep_dict[key].append({"path": f"videos/{fname}", "timestamp": i / fps})
+                    ep_dict[key].append(
+                        {"path": f"videos/{fname}", "timestamp": i / fps}
+                    )
 
             for key in not_image_keys:
                 ep_dict[key] = torch.stack(ep_dict[key])
@@ -604,9 +644,13 @@ def record(
                 if not is_headless():
                     listener.stop()
 
-                logging.info("Waiting for threads writing the images on disk to terminate...")
+                logging.info(
+                    "Waiting for threads writing the images on disk to terminate..."
+                )
                 for _ in tqdm.tqdm(
-                    concurrent.futures.as_completed(futures), total=len(futures), desc="Writting images"
+                    concurrent.futures.as_completed(futures),
+                    total=len(futures),
+                    desc="Writting images",
                 ):
                     pass
                 break
@@ -689,7 +733,13 @@ def record(
     return lerobot_dataset
 
 
-def replay(robot: Robot, episode: int, fps: int | None = None, root="data", repo_id="lerobot/debug"):
+def replay(
+    robot: Robot,
+    episode: int,
+    fps: int | None = None,
+    root="data",
+    repo_id="lerobot/debug",
+):
     # TODO(rcadene): Add option to record logs
     local_dir = Path(root) / repo_id
     if not local_dir.exists():
@@ -747,12 +797,18 @@ if __name__ == "__main__":
 
     parser_teleop = subparsers.add_parser("teleoperate", parents=[base_parser])
     parser_teleop.add_argument(
-        "--fps", type=none_or_int, default=None, help="Frames per second (set to None to disable)"
+        "--fps",
+        type=none_or_int,
+        default=None,
+        help="Frames per second (set to None to disable)",
     )
 
     parser_record = subparsers.add_parser("record", parents=[base_parser])
     parser_record.add_argument(
-        "--fps", type=none_or_int, default=None, help="Frames per second (set to None to disable)"
+        "--fps",
+        type=none_or_int,
+        default=None,
+        help="Frames per second (set to None to disable)",
     )
     parser_record.add_argument(
         "--root",
@@ -784,7 +840,9 @@ if __name__ == "__main__":
         default=60,
         help="Number of seconds for resetting the environment after each episode.",
     )
-    parser_record.add_argument("--num-episodes", type=int, default=50, help="Number of episodes to record.")
+    parser_record.add_argument(
+        "--num-episodes", type=int, default=50, help="Number of episodes to record."
+    )
     parser_record.add_argument(
         "--run-compute-stats",
         type=int,
@@ -837,7 +895,10 @@ if __name__ == "__main__":
 
     parser_replay = subparsers.add_parser("replay", parents=[base_parser])
     parser_replay.add_argument(
-        "--fps", type=none_or_int, default=None, help="Frames per second (set to None to disable)"
+        "--fps",
+        type=none_or_int,
+        default=None,
+        help="Frames per second (set to None to disable)",
     )
     parser_replay.add_argument(
         "--root",
@@ -851,7 +912,9 @@ if __name__ == "__main__":
         default="lerobot/test",
         help="Dataset identifier. By convention it should match '{hf_username}/{dataset_name}' (e.g. `lerobot/test`).",
     )
-    parser_replay.add_argument("--episode", type=int, default=0, help="Index of the episode to replay.")
+    parser_replay.add_argument(
+        "--episode", type=int, default=0, help="Index of the episode to replay."
+    )
 
     args = parser.parse_args()
 
@@ -882,9 +945,16 @@ if __name__ == "__main__":
 
         policy_cfg = None
         if pretrained_policy_name_or_path is not None:
-            pretrained_policy_path = get_pretrained_policy_path(pretrained_policy_name_or_path)
-            policy_cfg = init_hydra_config(pretrained_policy_path / "config.yaml", policy_overrides)
-            policy = make_policy(hydra_cfg=policy_cfg, pretrained_policy_name_or_path=pretrained_policy_path)
+            pretrained_policy_path = get_pretrained_policy_path(
+                pretrained_policy_name_or_path
+            )
+            policy_cfg = init_hydra_config(
+                pretrained_policy_path / "config.yaml", policy_overrides
+            )
+            policy = make_policy(
+                hydra_cfg=policy_cfg,
+                pretrained_policy_name_or_path=pretrained_policy_path,
+            )
             record(robot, policy, policy_cfg, **kwargs)
         else:
             record(robot, **kwargs)
