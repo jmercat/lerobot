@@ -301,6 +301,8 @@ class DiffusionModel(nn.Module):
         # Input validation.
         assert set(batch).issuperset({"observation.state", "action", "action_is_pad"})
         assert "observation.images" in batch or "observation.environment_state" in batch
+        if batch["observation.state"].ndim == 2:
+            batch["observation.state"] = einops.rearrange(batch["observation.state"], "b d -> b 1 d")
         n_obs_steps = batch["observation.state"].shape[1]
         horizon = batch["action"].shape[1]
         assert horizon == self.config.horizon
@@ -487,6 +489,8 @@ class DiffusionRgbEncoder(nn.Module):
             (B, D) image feature.
         """
         # Preprocess: maybe crop (if it was set up in the __init__).
+        if x.ndim == 3:
+            x = einops.rearrange(x, "(b c) h w -> b c h w", c=3)
         if self.do_crop:
             if self.training:  # noqa: SIM108
                 x = self.maybe_random_crop(x)
