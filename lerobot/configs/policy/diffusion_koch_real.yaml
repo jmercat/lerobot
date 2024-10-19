@@ -3,11 +3,21 @@
 seed: 1000
 dataset_repo_id: jmercat/koch_feed_cat
 
+override_dataset_stats:
+  # observation.images.laptop:
+  #   # stats from imagenet, since we use a pretrained vision model
+  #   mean: [[[0.485]], [[0.456]], [[0.406]]]  # (c,1,1)
+  #   std: [[[0.229]], [[0.224]], [[0.225]]]  # (c,1,1)
+  observation.images.phone:
+    # stats from imagenet, since we use a pretrained vision model
+    mean: [[[0.485]], [[0.456]], [[0.406]]]  # (c,1,1)
+    std: [[[0.229]], [[0.224]], [[0.225]]]  # (c,1,1)
+
 training:
-  offline_steps: 8000
+  offline_steps: 16000
   online_steps: 0
   eval_freq: -1
-  save_freq: 800
+  save_freq: 1600
   save_checkpoint: true
 
   batch_size: 64
@@ -31,8 +41,8 @@ policy:
   name: diffusion
 
   n_obs_steps: 1
-  horizon: 16
-  n_action_steps: 8
+  horizon: 128
+  n_action_steps: 32
 
   input_shapes:
     # observation.images.laptop: [3, 480, 640]
@@ -59,7 +69,7 @@ policy:
   spatial_softmax_num_keypoints: 32
 
   # Unet.
-  down_dims: [512, 1024, 2048]
+  down_dims: [512, 512, 512]
   kernel_size: 5
   n_groups: 8
   diffusion_step_embed_dim: 128
@@ -71,7 +81,7 @@ policy:
   beta_schedule: squaredcos_cap_v2
   beta_start: 0.0001
   beta_end: 0.02
-  prediction_type: epsilon # epsilon / sample
+  prediction_type: sample # epsilon / sample
   clip_sample: True
   clip_sample_range: 1.0
   # Inference
