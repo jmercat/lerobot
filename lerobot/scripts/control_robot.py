@@ -466,6 +466,7 @@ def record(
     # Save images using threads to reach high fps (30 and more)
     # Using `with` to exist smoothly if an execption is raised.
     futures = []
+    image_keys = []
     num_image_writers = num_image_writers_per_camera * len(robot.cameras)
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=num_image_writers
@@ -708,7 +709,7 @@ def record(
     if run_compute_stats:
         logging.info("Computing dataset statistics")
         say("Computing dataset statistics")
-        stats = compute_stats(lerobot_dataset)
+        stats = compute_stats(lerobot_dataset, num_workers=8)
         lerobot_dataset.stats = stats
     else:
         stats = {}
@@ -887,12 +888,21 @@ if __name__ == "__main__":
         ),
     )
     parser_record.add_argument(
+        "--policy-name",
+        type=str,
+        help="Name of the policy to use (e.g., 'gemini' for Gemini policy)",
+    )
+    parser_record.add_argument(
         "--policy-overrides",
         type=str,
         nargs="*",
         help="Any key=value arguments to override config values (use dots for.nested=overrides)",
     )
-
+    parser_record.add_argument(
+        "--policy-config-path",
+        type=str,
+        help="Path to the policy configuration file",
+    )
     parser_replay = subparsers.add_parser("replay", parents=[base_parser])
     parser_replay.add_argument(
         "--fps",
@@ -938,13 +948,29 @@ if __name__ == "__main__":
         teleoperate(robot, **kwargs)
 
     elif control_mode == "record":
+        policy_name = args.policy_name
+        policy_config_path = args.policy_config_path
+        policy_overrides = args.policy_overrides
         pretrained_policy_name_or_path = args.pretrained_policy_name_or_path
         policy_overrides = args.policy_overrides
         del kwargs["pretrained_policy_name_or_path"]
         del kwargs["policy_overrides"]
 
         policy_cfg = None
-        if pretrained_policy_name_or_path is not None:
+        del kwargs["policy_name"]
+        del kwargs["policy_config_path"]
+
+        if policy_name == "gemini":
+            policy_cfg = init_hydra_config(policy_config_path, policy_overrides)
+            policy = make_policy(
+                hydra_cfg=policy_cfg,
+                pretrained_policy_name_or_path=None,
+                dataset_stats={"action": {"mean": torch.tensor([0.0]), "std": torch.tensor([1.0]), "min": torch.tensor([0.0]), "max": torch.tensor([1.0])}},
+            )
+            # Remove pretrained policy name or path
+            del kwargs["pretrained_policy_name_or_path"]
+            record(robot, policy, policy_cfg, **kwargs)
+        elif pretrained_policy_name_or_path is not None:
             pretrained_policy_path = get_pretrained_policy_path(
                 pretrained_policy_name_or_path
             )

@@ -5,6 +5,7 @@ wandb
 
 # Data
 data
+data_save
 outputs
 
 # Apple

@@ -153,8 +153,8 @@ class DiffusionPolicy(
             batch = dict(batch)  # shallow copy so that adding a key doesn't modify the original
             batch["observation.images"] = torch.stack([batch[k] for k in self.expected_image_keys], dim=-4)
         batch = self.normalize_targets(batch)
-        loss, l1_loss = self.diffusion.compute_loss(batch)
-        return {"loss": loss, "l1_loss": l1_loss}
+        loss = self.diffusion.compute_loss(batch)
+        return {"loss": loss}
 
 
 def _make_noise_scheduler(name: str, **kwargs: dict) -> DDPMScheduler | DDIMScheduler:

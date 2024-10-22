@@ -113,6 +113,8 @@ EMBEDDING_REGISTRY = {
 class StateTokenizer():
     def __init__(self, tokenizer_name: str) -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        self.pad_token_id = self.tokenizer.pad_token_id
+        self.sep_token_id = self.tokenizer.sep_token_id
 
     def __call__(self, state: torch.Tensor):
         shape = state.shape
@@ -326,6 +328,10 @@ class MBMPolicy(
             batch = dict(batch)  # shallow copy
             transformed_images = [self.image_transform(batch[k]) for k in self.expected_image_keys]
             batch["observation.images"] = torch.stack(transformed_images, dim=-4)
+
+        if batch.get("action_ids") is None:
+            bs, d = batch["observation.state"].shape
+            batch["action_ids"] = torch.full((bs, self.config.n_action_steps, d), self.state_tokenizer.pad_token_id, dtype=torch.long, device=batch["observation.state"].device)
 
         actions, _, _ = self.model(batch)
 

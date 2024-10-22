@@ -1,0 +1,57 @@
+# @package _global_
+
+# Configuration for Gemini-based policy on real-world datasets collected on Alexander Koch's robots.
+# This config is used to run inference using the Gemini API for action generation.
+#
+# Example of usage for inference:
+# ```bash
+# python lerobot/scripts/control_robot.py \
+#   policy=gemini_koch_real \
+#   env=koch_real
+# ```
+
+seed: 1000
+dataset_repo_id: jmercat/koch_feed_cat
+
+# Add this line to specify the device
+device: "mps"  # or "cuda" if you want to use GPU
+
+# No need for dataset stats override as we're not normalizing inputs
+
+training:
+  # No training parameters needed for Gemini policy
+
+eval:
+  n_episodes: 5
+  batch_size: 1  # Process one observation at a time
+
+# Gemini policy configuration
+policy:
+  name: gemini
+
+  # Input / output structure
+  input_shapes:
+    observation.images.phone: [3, 480, 640]
+    observation.state: ["${env.state_dim}"]
+  output_shapes:
+    action: ["${env.action_dim}"]
+
+  # Only keep output normalization for action scaling
+  output_normalization_modes:
+    action: mean_std
+
+  # Gemini API configuration
+  gemini_api_key: "AIzaSyBJzLAJweKkmTKnsNfXgS-5p6dgODF96Sc"
+
+  # Task description
+  task_description: "control the robot to perform the next step in the current task"
+
+  # Additional Gemini-specific parameters
+  max_action_history: 16  # Number of previous actions to include in the prompt
+
+env:
+  # Environment-specific parameters
+  state_dim: 6  # Adjust based on your robot's state dimension
+  action_dim: 6  # Adjust based on your robot's action dimension
+
+# Add any other necessary configuration parameters for your specific setup

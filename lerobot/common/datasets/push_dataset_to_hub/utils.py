@@ -27,7 +27,7 @@ from lerobot.common.datasets.video_utils import encode_video_frames
 def concatenate_episodes(ep_dicts):
     data_dict = {}
 
-    keys = ep_dicts[0].keys()
+    keys = ep_dicts[-1].keys()
     for key in keys:
         if torch.is_tensor(ep_dicts[0][key][0]):
             data_dict[key] = torch.cat([ep_dict[key] for ep_dict in ep_dicts])
