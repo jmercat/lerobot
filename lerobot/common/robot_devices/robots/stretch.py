@@ -77,9 +77,7 @@ class StretchRobot(StretchAPI):
         if not self.is_homed():
             self.home()
 
-    def teleop_step(
-        self, record_data=False
-    ) -> None | tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+    def teleop_step(self, record_data=False) -> None | tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
         # TODO(aliberts): return ndarrays instead of torch.Tensors
         if not self.is_connected:
             raise ConnectionError()

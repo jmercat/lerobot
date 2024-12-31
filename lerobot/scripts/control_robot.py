@@ -117,7 +117,12 @@ from lerobot.common.robot_devices.control_utils import (
 from lerobot.common.robot_devices.robots.factory import make_robot
 from lerobot.common.robot_devices.robots.utils import Robot
 from lerobot.common.robot_devices.utils import busy_wait, safe_disconnect
-from lerobot.common.utils.utils import init_hydra_config, init_logging, log_say, none_or_int
+from lerobot.common.utils.utils import (
+    init_hydra_config,
+    init_logging,
+    log_say,
+    none_or_int,
+)
 
 ########################################################################################
 # Control modes
@@ -148,9 +153,7 @@ def calibrate(robot: Robot, arms: list[str] | None):
         )
 
     if len(unknown_arms) > 0:
-        raise ValueError(
-            f"Unknown arms provided ('{unknown_arms_str}'). Available arms are `{available_arms_str}`."
-        )
+        raise ValueError(f"Unknown arms provided ('{unknown_arms_str}'). Available arms are `{available_arms_str}`.")
 
     for arm_id in arms:
         arm_calib_path = robot.calibration_dir / f"{arm_id}.json"
@@ -172,7 +175,10 @@ def calibrate(robot: Robot, arms: list[str] | None):
 
 @safe_disconnect
 def teleoperate(
-    robot: Robot, fps: int | None = None, teleop_time_s: float | None = None, display_cameras: bool = False
+    robot: Robot,
+    fps: int | None = None,
+    teleop_time_s: float | None = None,
+    display_cameras: bool = False,
 ):
     control_loop(
         robot,
@@ -299,9 +305,7 @@ def record(
         # Current code logic doesn't allow to teleoperate during this time.
         # TODO(rcadene): add an option to enable teleoperation during reset
         # Skip reset for the last episode to be recorded
-        if not events["stop_recording"] and (
-            (dataset.num_episodes < num_episodes - 1) or events["rerecord_episode"]
-        ):
+        if not events["stop_recording"] and ((dataset.num_episodes < num_episodes - 1) or events["rerecord_episode"]):
             log_say("Reset the environment", play_sounds)
             reset_environment(robot, events, reset_time_s)
 
@@ -395,7 +399,10 @@ if __name__ == "__main__":
 
     parser_teleop = subparsers.add_parser("teleoperate", parents=[base_parser])
     parser_teleop.add_argument(
-        "--fps", type=none_or_int, default=None, help="Frames per second (set to None to disable)"
+        "--fps",
+        type=none_or_int,
+        default=None,
+        help="Frames per second (set to None to disable)",
     )
     parser_teleop.add_argument(
         "--display-cameras",
@@ -407,7 +414,10 @@ if __name__ == "__main__":
     parser_record = subparsers.add_parser("record", parents=[base_parser])
     task_args = parser_record.add_mutually_exclusive_group(required=True)
     parser_record.add_argument(
-        "--fps", type=none_or_int, default=None, help="Frames per second (set to None to disable)"
+        "--fps",
+        type=none_or_int,
+        default=None,
+        help="Frames per second (set to None to disable)",
     )
     task_args.add_argument(
         "--single-task",
@@ -520,7 +530,10 @@ if __name__ == "__main__":
 
     parser_replay = subparsers.add_parser("replay", parents=[base_parser])
     parser_replay.add_argument(
-        "--fps", type=none_or_int, default=None, help="Frames per second (set to None to disable)"
+        "--fps",
+        type=none_or_int,
+        default=None,
+        help="Frames per second (set to None to disable)",
     )
     parser_replay.add_argument(
         "--root",
@@ -555,6 +568,7 @@ if __name__ == "__main__":
     del kwargs["robot_overrides"]
 
     robot_cfg = init_hydra_config(robot_path, robot_overrides)
+    breakpoint()
     robot = make_robot(robot_cfg)
 
     if control_mode == "calibrate":

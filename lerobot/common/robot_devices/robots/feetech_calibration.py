@@ -12,9 +12,7 @@ from lerobot.common.robot_devices.motors.feetech import (
 )
 from lerobot.common.robot_devices.motors.utils import MotorsBus
 
-URL_TEMPLATE = (
-    "https://raw.githubusercontent.com/huggingface/lerobot/main/media/{robot}/{arm}_{position}.webp"
-)
+URL_TEMPLATE = "https://raw.githubusercontent.com/huggingface/lerobot/main/media/{robot}/{arm}_{position}.webp"
 
 # The following positions are provided in nominal degree range ]-180, +180[
 # For more info on these constants, see comments in the code where they get used.
@@ -83,25 +81,17 @@ def move_to_calibrate(
     initial_pos = arm.read("Present_Position", motor_name)
 
     if positive_first:
-        p_present_pos = move_until_block(
-            arm, motor_name, positive_direction=True, while_move_hook=while_move_hook
-        )
+        p_present_pos = move_until_block(arm, motor_name, positive_direction=True, while_move_hook=while_move_hook)
     else:
-        n_present_pos = move_until_block(
-            arm, motor_name, positive_direction=False, while_move_hook=while_move_hook
-        )
+        n_present_pos = move_until_block(arm, motor_name, positive_direction=False, while_move_hook=while_move_hook)
 
     if in_between_move_hook is not None:
         in_between_move_hook()
 
     if positive_first:
-        n_present_pos = move_until_block(
-            arm, motor_name, positive_direction=False, while_move_hook=while_move_hook
-        )
+        n_present_pos = move_until_block(arm, motor_name, positive_direction=False, while_move_hook=while_move_hook)
     else:
-        p_present_pos = move_until_block(
-            arm, motor_name, positive_direction=True, while_move_hook=while_move_hook
-        )
+        p_present_pos = move_until_block(arm, motor_name, positive_direction=True, while_move_hook=while_move_hook)
 
     zero_pos = (n_present_pos + p_present_pos) / 2
 
@@ -193,7 +183,10 @@ def run_arm_auto_calibration_so100(arm: MotorsBus, robot_type: str, arm_name: st
 
     print("Calibrate elbow_flex")
     calib["elbow_flex"] = move_to_calibrate(
-        arm, "elbow_flex", positive_first=False, in_between_move_hook=in_between_move_hook
+        arm,
+        "elbow_flex",
+        positive_first=False,
+        in_between_move_hook=in_between_move_hook,
     )
     calib["elbow_flex"] = apply_offset(calib["elbow_flex"], offset=80 - 1024)
 
@@ -225,7 +218,11 @@ def run_arm_auto_calibration_so100(arm: MotorsBus, robot_type: str, arm_name: st
         }
         arm.write("Goal_Position", list(positions.values()), list(positions.keys()))
 
-    arm.write("Goal_Position", round(calib["shoulder_lift"]["zero_pos"] - 1600), "shoulder_lift")
+    arm.write(
+        "Goal_Position",
+        round(calib["shoulder_lift"]["zero_pos"] - 1600),
+        "shoulder_lift",
+    )
     time.sleep(2)
     arm.write("Goal_Position", round(calib["elbow_flex"]["zero_pos"] + 1700), "elbow_flex")
     time.sleep(2)
@@ -236,7 +233,11 @@ def run_arm_auto_calibration_so100(arm: MotorsBus, robot_type: str, arm_name: st
 
     print("Calibrate wrist_roll")
     calib["wrist_roll"] = move_to_calibrate(
-        arm, "wrist_roll", invert_drive_mode=True, positive_first=False, while_move_hook=while_move_hook
+        arm,
+        "wrist_roll",
+        invert_drive_mode=True,
+        positive_first=False,
+        while_move_hook=while_move_hook,
     )
 
     arm.write("Goal_Position", calib["wrist_roll"]["zero_pos"], "wrist_roll")

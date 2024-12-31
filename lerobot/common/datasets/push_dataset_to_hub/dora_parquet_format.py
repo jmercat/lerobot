@@ -26,7 +26,9 @@ import torch
 from datasets import Dataset, Features, Image, Sequence, Value
 
 from lerobot.common.datasets.lerobot_dataset import CODEBASE_VERSION
-from lerobot.common.datasets.push_dataset_to_hub.utils import calculate_episode_data_index
+from lerobot.common.datasets.push_dataset_to_hub.utils import (
+    calculate_episode_data_index,
+)
 from lerobot.common.datasets.utils import (
     hf_transform_to_torch,
 )
@@ -42,7 +44,13 @@ def check_format(raw_dir) -> bool:
     return True
 
 
-def load_from_raw(raw_dir: Path, videos_dir: Path, fps: int, video: bool, episodes: list[int] | None = None):
+def load_from_raw(
+    raw_dir: Path,
+    videos_dir: Path,
+    fps: int,
+    video: bool,
+    episodes: list[int] | None = None,
+):
     # Load data stream that will be used as reference for the timestamps synchronization
     reference_files = list(raw_dir.glob("observation.images.cam_*.parquet"))
     if len(reference_files) == 0:
@@ -170,19 +178,20 @@ def to_hf_dataset(data_dict, video) -> Dataset:
             features[key] = Image()
 
     features["observation.state"] = Sequence(
-        length=data_dict["observation.state"].shape[1], feature=Value(dtype="float32", id=None)
+        length=data_dict["observation.state"].shape[1],
+        feature=Value(dtype="float32", id=None),
     )
     if "observation.velocity" in data_dict:
         features["observation.velocity"] = Sequence(
-            length=data_dict["observation.velocity"].shape[1], feature=Value(dtype="float32", id=None)
+            length=data_dict["observation.velocity"].shape[1],
+            feature=Value(dtype="float32", id=None),
         )
     if "observation.effort" in data_dict:
         features["observation.effort"] = Sequence(
-            length=data_dict["observation.effort"].shape[1], feature=Value(dtype="float32", id=None)
+            length=data_dict["observation.effort"].shape[1],
+            feature=Value(dtype="float32", id=None),
         )
-    features["action"] = Sequence(
-        length=data_dict["action"].shape[1], feature=Value(dtype="float32", id=None)
-    )
+    features["action"] = Sequence(length=data_dict["action"].shape[1], feature=Value(dtype="float32", id=None))
     features["episode_index"] = Value(dtype="int64", id=None)
     features["frame_index"] = Value(dtype="int64", id=None)
     features["timestamp"] = Value(dtype="float32", id=None)

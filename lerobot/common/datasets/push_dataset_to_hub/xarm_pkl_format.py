@@ -40,7 +40,10 @@ from lerobot.common.datasets.video_utils import VideoFrame, encode_video_frames
 
 def check_format(raw_dir):
     keys = {"actions", "rewards", "dones"}
-    nested_keys = {"observations": {"rgb", "state"}, "next_observations": {"rgb", "state"}}
+    nested_keys = {
+        "observations": {"rgb", "state"},
+        "next_observations": {"rgb", "state"},
+    }
 
     xarm_files = list(raw_dir.glob("*.pkl"))
     assert len(xarm_files) > 0
@@ -153,11 +156,10 @@ def to_hf_dataset(data_dict, video):
         features["observation.image"] = Image()
 
     features["observation.state"] = Sequence(
-        length=data_dict["observation.state"].shape[1], feature=Value(dtype="float32", id=None)
+        length=data_dict["observation.state"].shape[1],
+        feature=Value(dtype="float32", id=None),
     )
-    features["action"] = Sequence(
-        length=data_dict["action"].shape[1], feature=Value(dtype="float32", id=None)
-    )
+    features["action"] = Sequence(length=data_dict["action"].shape[1], feature=Value(dtype="float32", id=None))
     features["episode_index"] = Value(dtype="int64", id=None)
     features["frame_index"] = Value(dtype="int64", id=None)
     features["timestamp"] = Value(dtype="float32", id=None)

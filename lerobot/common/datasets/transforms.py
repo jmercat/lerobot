@@ -48,9 +48,7 @@ class RandomSubsetApply(Transform):
         if p is None:
             p = [1] * len(transforms)
         elif len(p) != len(transforms):
-            raise ValueError(
-                f"Length of p doesn't match the number of transforms: {len(p)} != {len(transforms)}"
-            )
+            raise ValueError(f"Length of p doesn't match the number of transforms: {len(p)} != {len(transforms)}")
 
         if n_subset is None:
             n_subset = len(transforms)
@@ -154,13 +152,9 @@ def get_image_transforms(
     def check_value(name, weight, min_max):
         if min_max is not None:
             if len(min_max) != 2:
-                raise ValueError(
-                    f"`{name}_min_max` is expected to be a tuple of 2 dimensions, but {min_max} provided."
-                )
+                raise ValueError(f"`{name}_min_max` is expected to be a tuple of 2 dimensions, but {min_max} provided.")
             if weight < 0.0:
-                raise ValueError(
-                    f"`{name}_weight` is expected to be 0 or positive, but is negative ({weight})."
-                )
+                raise ValueError(f"`{name}_weight` is expected to be 0 or positive, but is negative ({weight}).")
 
     check_value("brightness", brightness_weight, brightness_min_max)
     check_value("contrast", contrast_weight, contrast_min_max)

@@ -22,7 +22,11 @@ from lerobot.common.datasets.utils import get_features_from_robot
 from lerobot.common.policies.factory import make_policy
 from lerobot.common.robot_devices.robots.utils import Robot
 from lerobot.common.robot_devices.utils import busy_wait
-from lerobot.common.utils.utils import get_safe_torch_device, init_hydra_config, set_global_seed
+from lerobot.common.utils.utils import (
+    get_safe_torch_device,
+    init_hydra_config,
+    set_global_seed,
+)
 from lerobot.scripts.eval import get_pretrained_policy_path
 
 
@@ -331,9 +335,7 @@ def sanity_check_dataset_name(repo_id, policy):
 
     # Check if dataset_name starts with "eval_" but policy is missing
     if dataset_name.startswith("eval_") and policy is None:
-        raise ValueError(
-            f"Your dataset name begins with 'eval_' ({dataset_name}), but no policy is provided."
-        )
+        raise ValueError(f"Your dataset name begins with 'eval_' ({dataset_name}), but no policy is provided.")
 
     # Check if dataset_name does not start with "eval_" but policy is provided
     if not dataset_name.startswith("eval_") and policy is not None:
@@ -342,9 +344,7 @@ def sanity_check_dataset_name(repo_id, policy):
         )
 
 
-def sanity_check_dataset_robot_compatibility(
-    dataset: LeRobotDataset, robot: Robot, fps: int, use_videos: bool
-) -> None:
+def sanity_check_dataset_robot_compatibility(dataset: LeRobotDataset, robot: Robot, fps: int, use_videos: bool) -> None:
     fields = [
         ("robot_type", dataset.meta.robot_type, robot.robot_type),
         ("fps", dataset.fps, fps),
@@ -358,6 +358,4 @@ def sanity_check_dataset_robot_compatibility(
             mismatches.append(f"{field}: expected {present_value}, got {dataset_value}")
 
     if mismatches:
-        raise ValueError(
-            "Dataset metadata compatibility check failed with mismatches:\n" + "\n".join(mismatches)
-        )
+        raise ValueError("Dataset metadata compatibility check failed with mismatches:\n" + "\n".join(mismatches))

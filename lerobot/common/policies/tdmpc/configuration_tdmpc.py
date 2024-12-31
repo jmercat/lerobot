@@ -172,9 +172,7 @@ class TDMPCConfig:
             if self.input_shapes[image_key][-2] != self.input_shapes[image_key][-1]:
                 # TODO(alexander-soare): This limitation is solely because of code in the random shift
                 # augmentation. It should be able to be removed.
-                raise ValueError(
-                    f"Only square images are handled now. Got image shape {self.input_shapes[image_key]}."
-                )
+                raise ValueError(f"Only square images are handled now. Got image shape {self.input_shapes[image_key]}.")
         if self.n_gaussian_samples <= 0:
             raise ValueError(
                 f"The number of guassian samples for CEM should be non-zero. Got `{self.n_gaussian_samples=}`"
@@ -187,9 +185,7 @@ class TDMPCConfig:
             )
         if self.n_action_steps > 1:
             if self.n_action_repeats != 1:
-                raise ValueError(
-                    "If `n_action_steps > 1`, `n_action_repeats` must be left to its default value of 1."
-                )
+                raise ValueError("If `n_action_steps > 1`, `n_action_repeats` must be left to its default value of 1.")
             if not self.use_mpc:
                 raise ValueError("If `n_action_steps > 1`, `use_mpc` must be set to `True`.")
             if self.n_action_steps > self.horizon:

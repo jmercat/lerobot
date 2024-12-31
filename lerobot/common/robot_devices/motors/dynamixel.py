@@ -8,7 +8,10 @@ from copy import deepcopy
 import numpy as np
 import tqdm
 
-from lerobot.common.robot_devices.utils import RobotDeviceAlreadyConnectedError, RobotDeviceNotConnectedError
+from lerobot.common.robot_devices.utils import (
+    RobotDeviceAlreadyConnectedError,
+    RobotDeviceNotConnectedError,
+)
 from lerobot.common.utils.utils import capture_timestamp_utc
 
 PROTOCOL_VERSION = 2.0
@@ -708,9 +711,7 @@ class DynamixelMotorsBus:
 
         if data_name not in self.group_readers:
             # create new group reader
-            self.group_readers[group_key] = dxl.GroupSyncRead(
-                self.port_handler, self.packet_handler, addr, bytes
-            )
+            self.group_readers[group_key] = dxl.GroupSyncRead(self.port_handler, self.packet_handler, addr, bytes)
             for idx in motor_ids:
                 self.group_readers[group_key].addParam(idx)
 
@@ -778,7 +779,12 @@ class DynamixelMotorsBus:
                 f"{self.packet_handler.getTxRxResult(comm)}"
             )
 
-    def write(self, data_name, values: int | float | np.ndarray, motor_names: str | list[str] | None = None):
+    def write(
+        self,
+        data_name,
+        values: int | float | np.ndarray,
+        motor_names: str | list[str] | None = None,
+    ):
         if not self.is_connected:
             raise RobotDeviceNotConnectedError(
                 f"DynamixelMotorsBus({self.port}) is not connected. You need to run `motors_bus.connect()`."
@@ -820,9 +826,7 @@ class DynamixelMotorsBus:
 
         init_group = data_name not in self.group_readers
         if init_group:
-            self.group_writers[group_key] = dxl.GroupSyncWrite(
-                self.port_handler, self.packet_handler, addr, bytes
-            )
+            self.group_writers[group_key] = dxl.GroupSyncWrite(self.port_handler, self.packet_handler, addr, bytes)
 
         for idx, value in zip(motor_ids, values, strict=True):
             data = convert_to_bytes(value, bytes, self.mock)

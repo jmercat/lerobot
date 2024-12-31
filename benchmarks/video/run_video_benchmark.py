@@ -129,7 +129,8 @@ def save_first_episode(imgs_dir: Path, dataset: LeRobotDataset) -> None:
             break
 
 
-def sample_timestamps(timestamps_mode: str, ep_num_images: int, fps: int) -> list[float]:
+def sample_timestamps(
+        timestamps_mode: str, ep_num_images: int, fps: int) -> list[float]:
     # Start at 5 to allow for 2_frames_4_space and 6_frames
     idx = random.randint(5, ep_num_images - 1)
     match timestamps_mode:

@@ -199,7 +199,8 @@ def _get_major_minor(version: str) -> tuple[int]:
 
 class BackwardCompatibilityError(Exception):
     def __init__(self, repo_id, version):
-        message = textwrap.dedent(f"""
+        message = textwrap.dedent(
+            f"""
             BackwardCompatibilityError: The dataset you requested ({repo_id}) is in {version} format.
 
             We introduced a new format since v2.0 which is not backward compatible with v1.x.
@@ -217,12 +218,16 @@ class BackwardCompatibilityError(Exception):
 
             If you encounter a problem, contact LeRobot maintainers on [Discord](https://discord.com/invite/s3KuuzsPFb)
             or open an [issue on GitHub](https://github.com/huggingface/lerobot/issues/new/choose).
-        """)
+        """
+        )
         super().__init__(message)
 
 
 def check_version_compatibility(
-    repo_id: str, version_to_check: str, current_version: str, enforce_breaking_major: bool = True
+    repo_id: str,
+    version_to_check: str,
+    current_version: str,
+    enforce_breaking_major: bool = True,
 ) -> None:
     current_major, _ = _get_major_minor(current_version)
     major_to_check, _ = _get_major_minor(version_to_check)
@@ -272,9 +277,7 @@ def get_hf_features_from_features(features: dict) -> datasets.Features:
             hf_features[key] = datasets.Value(dtype=ft["dtype"])
         else:
             assert len(ft["shape"]) == 1
-            hf_features[key] = datasets.Sequence(
-                length=ft["shape"][0], feature=datasets.Value(dtype=ft["dtype"])
-            )
+            hf_features[key] = datasets.Sequence(length=ft["shape"][0], feature=datasets.Value(dtype=ft["dtype"]))
 
     return datasets.Features(hf_features)
 
@@ -283,8 +286,7 @@ def get_features_from_robot(robot: Robot, use_videos: bool = True) -> dict:
     camera_ft = {}
     if robot.cameras:
         camera_ft = {
-            key: {"dtype": "video" if use_videos else "image", **ft}
-            for key, ft in robot.camera_features.items()
+            key: {"dtype": "video" if use_videos else "image", **ft} for key, ft in robot.camera_features.items()
         }
     return {**robot.motor_features, **camera_ft, **DEFAULT_FEATURES}
 
@@ -313,9 +315,7 @@ def create_empty_dataset_info(
     }
 
 
-def get_episode_data_index(
-    episode_dicts: list[dict], episodes: list[int] | None = None
-) -> dict[str, torch.Tensor]:
+def get_episode_data_index(episode_dicts: list[dict], episodes: list[int] | None = None) -> dict[str, torch.Tensor]:
     episode_lengths = {ep_idx: ep_dict["length"] for ep_idx, ep_dict in enumerate(episode_dicts)}
     if episodes is not None:
         episode_lengths = {ep_idx: episode_lengths[ep_idx] for ep_idx in episodes}
@@ -337,7 +337,9 @@ def calculate_total_episode(
     return total_episodes
 
 
-def calculate_episode_data_index(hf_dataset: datasets.Dataset) -> dict[str, torch.Tensor]:
+def calculate_episode_data_index(
+    hf_dataset: datasets.Dataset,
+) -> dict[str, torch.Tensor]:
     episode_lengths = []
     table = hf_dataset.data.table
     total_episodes = calculate_total_episode(hf_dataset)
@@ -404,7 +406,10 @@ def check_timestamps_sync(
 
 
 def check_delta_timestamps(
-    delta_timestamps: dict[str, list[float]], fps: int, tolerance_s: float, raise_value_error: bool = True
+    delta_timestamps: dict[str, list[float]],
+    fps: int,
+    tolerance_s: float,
+    raise_value_error: bool = True,
 ) -> bool:
     """This will check if all the values in delta_timestamps are multiples of 1/fps +/- tolerance.
     This is to ensure that these delta_timestamps added to any timestamp from a dataset will themselves be

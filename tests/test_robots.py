@@ -29,8 +29,16 @@ import pytest
 import torch
 
 from lerobot.common.robot_devices.robots.manipulator import ManipulatorRobot
-from lerobot.common.robot_devices.utils import RobotDeviceAlreadyConnectedError, RobotDeviceNotConnectedError
-from tests.utils import TEST_ROBOT_TYPES, make_robot, mock_calibration_dir, require_robot
+from lerobot.common.robot_devices.utils import (
+    RobotDeviceAlreadyConnectedError,
+    RobotDeviceNotConnectedError,
+)
+from tests.utils import (
+    TEST_ROBOT_TYPES,
+    make_robot,
+    mock_calibration_dir,
+    require_robot,
+)
 
 
 @pytest.mark.parametrize("robot_type, mock", TEST_ROBOT_TYPES)

@@ -26,7 +26,9 @@ from datasets import Dataset, Features, Image, Sequence, Value
 from PIL import Image as PILImage
 
 from lerobot.common.datasets.lerobot_dataset import CODEBASE_VERSION
-from lerobot.common.datasets.push_dataset_to_hub._umi_imagecodecs_numcodecs import register_codecs
+from lerobot.common.datasets.push_dataset_to_hub._umi_imagecodecs_numcodecs import (
+    register_codecs,
+)
 from lerobot.common.datasets.push_dataset_to_hub.utils import (
     calculate_episode_data_index,
     concatenate_episodes,
@@ -135,9 +137,7 @@ def load_from_raw(
                     shutil.rmtree(tmp_imgs_dir)
 
                 # store the reference to the video frame
-                ep_dict[img_key] = [
-                    {"path": f"videos/{fname}", "timestamp": i / fps} for i in range(num_frames)
-                ]
+                ep_dict[img_key] = [{"path": f"videos/{fname}", "timestamp": i / fps} for i in range(num_frames)]
             else:
                 ep_dict[img_key] = [PILImage.fromarray(x) for x in imgs_array]
 
@@ -172,7 +172,8 @@ def to_hf_dataset(data_dict, video):
         features["observation.image"] = Image()
 
     features["observation.state"] = Sequence(
-        length=data_dict["observation.state"].shape[1], feature=Value(dtype="float32", id=None)
+        length=data_dict["observation.state"].shape[1],
+        feature=Value(dtype="float32", id=None),
     )
     features["episode_index"] = Value(dtype="int64", id=None)
     features["frame_index"] = Value(dtype="int64", id=None)
@@ -185,14 +186,11 @@ def to_hf_dataset(data_dict, video):
     # `gripper_width` indicates the distance between the grippers, and this value is included
     # in the state vector, which comprises the concatenation of the end-effector position
     # and gripper width.
-    features["end_pose"] = Sequence(
-        length=data_dict["end_pose"].shape[1], feature=Value(dtype="float32", id=None)
-    )
-    features["start_pos"] = Sequence(
-        length=data_dict["start_pos"].shape[1], feature=Value(dtype="float32", id=None)
-    )
+    features["end_pose"] = Sequence(length=data_dict["end_pose"].shape[1], feature=Value(dtype="float32", id=None))
+    features["start_pos"] = Sequence(length=data_dict["start_pos"].shape[1], feature=Value(dtype="float32", id=None))
     features["gripper_width"] = Sequence(
-        length=data_dict["gripper_width"].shape[1], feature=Value(dtype="float32", id=None)
+        length=data_dict["gripper_width"].shape[1],
+        feature=Value(dtype="float32", id=None),
     )
 
     hf_dataset = Dataset.from_dict(data_dict, features=Features(features))
@@ -216,9 +214,7 @@ def from_raw_to_lerobot_format(
         fps = 10
 
     if not video:
-        logging.warning(
-            "Generating UMI dataset without `video=True` creates ~150GB on disk and requires ~80GB in RAM."
-        )
+        logging.warning("Generating UMI dataset without `video=True` creates ~150GB on disk and requires ~80GB in RAM.")
 
     data_dict = load_from_raw(raw_dir, videos_dir, fps, video, episodes, encoding)
     hf_dataset = to_hf_dataset(data_dict, video)

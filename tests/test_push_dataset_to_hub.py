@@ -31,7 +31,11 @@ def _mock_download_raw_pusht(raw_dir, num_frames=4, num_episodes=3):
     zarr_data = zarr.group(store=store)
 
     zarr_data.create_dataset(
-        "data/action", shape=(num_frames, 1), chunks=(num_frames, 1), dtype=np.float32, overwrite=True
+        "data/action",
+        shape=(num_frames, 1),
+        chunks=(num_frames, 1),
+        dtype=np.float32,
+        overwrite=True,
     )
     zarr_data.create_dataset(
         "data/img",
@@ -41,16 +45,32 @@ def _mock_download_raw_pusht(raw_dir, num_frames=4, num_episodes=3):
         overwrite=True,
     )
     zarr_data.create_dataset(
-        "data/n_contacts", shape=(num_frames, 2), chunks=(num_frames, 2), dtype=np.float32, overwrite=True
+        "data/n_contacts",
+        shape=(num_frames, 2),
+        chunks=(num_frames, 2),
+        dtype=np.float32,
+        overwrite=True,
     )
     zarr_data.create_dataset(
-        "data/state", shape=(num_frames, 5), chunks=(num_frames, 5), dtype=np.float32, overwrite=True
+        "data/state",
+        shape=(num_frames, 5),
+        chunks=(num_frames, 5),
+        dtype=np.float32,
+        overwrite=True,
     )
     zarr_data.create_dataset(
-        "data/keypoint", shape=(num_frames, 9, 2), chunks=(num_frames, 9, 2), dtype=np.float32, overwrite=True
+        "data/keypoint",
+        shape=(num_frames, 9, 2),
+        chunks=(num_frames, 9, 2),
+        dtype=np.float32,
+        overwrite=True,
     )
     zarr_data.create_dataset(
-        "meta/episode_ends", shape=(num_episodes,), chunks=(num_episodes,), dtype=np.int32, overwrite=True
+        "meta/episode_ends",
+        shape=(num_episodes,),
+        chunks=(num_episodes,),
+        dtype=np.int32,
+        overwrite=True,
     )
 
     zarr_data["data/action"][:] = np.random.randn(num_frames, 1)
@@ -93,7 +113,11 @@ def _mock_download_raw_umi(raw_dir, num_frames=4, num_episodes=3):
         overwrite=True,
     )
     zarr_data.create_dataset(
-        "data/robot0_eef_pos", shape=(num_frames, 5), chunks=(num_frames, 5), dtype=np.float32, overwrite=True
+        "data/robot0_eef_pos",
+        shape=(num_frames, 5),
+        chunks=(num_frames, 5),
+        dtype=np.float32,
+        overwrite=True,
     )
     zarr_data.create_dataset(
         "data/robot0_eef_rot_axis_angle",
@@ -110,7 +134,11 @@ def _mock_download_raw_umi(raw_dir, num_frames=4, num_episodes=3):
         overwrite=True,
     )
     zarr_data.create_dataset(
-        "meta/episode_ends", shape=(num_episodes,), chunks=(num_episodes,), dtype=np.int32, overwrite=True
+        "meta/episode_ends",
+        shape=(num_episodes,),
+        chunks=(num_episodes,),
+        dtype=np.int32,
+        overwrite=True,
     )
 
     zarr_data["data/camera0_rgb"][:] = np.random.randint(0, 255, size=(num_frames, 96, 96, 3), dtype=np.uint8)
@@ -152,12 +180,21 @@ def _mock_download_raw_aloha(raw_dir, num_frames=6, num_episodes=3):
         path_h5 = raw_dir / f"episode_{ep_idx}.hdf5"
         with h5py.File(str(path_h5), "w") as f:
             f.create_dataset("action", data=np.random.randn(num_frames // num_episodes, 14))
-            f.create_dataset("observations/qpos", data=np.random.randn(num_frames // num_episodes, 14))
-            f.create_dataset("observations/qvel", data=np.random.randn(num_frames // num_episodes, 14))
+            f.create_dataset(
+                "observations/qpos",
+                data=np.random.randn(num_frames // num_episodes, 14),
+            )
+            f.create_dataset(
+                "observations/qvel",
+                data=np.random.randn(num_frames // num_episodes, 14),
+            )
             f.create_dataset(
                 "observations/images/top",
                 data=np.random.randint(
-                    0, 255, size=(num_frames // num_episodes, 480, 640, 3), dtype=np.uint8
+                    0,
+                    255,
+                    size=(num_frames // num_episodes, 480, 640, 3),
+                    dtype=np.uint8,
                 ),
             )
 
@@ -191,7 +228,12 @@ def _mock_download_raw_dora(raw_dir, num_frames=6, num_episodes=3, fps=30):
         action = np.random.randn(21).tolist()
         state = np.random.randn(21).tolist()
         ep_idx = episode_indices_mapping[i]
-        frame = [{"path": f"videos/{cam_key}_episode_{ep_idx:06d}.mp4", "timestamp": frame_idx / fps}]
+        frame = [
+            {
+                "path": f"videos/{cam_key}_episode_{ep_idx:06d}.mp4",
+                "timestamp": frame_idx / fps,
+            }
+        ]
         timestamps.append(t_utc)
         actions.append(action)
         states.append(state)
@@ -307,15 +349,14 @@ def test_push_dataset_to_hub_format(required_packages, tmpdir, raw_format, repo_
         # Check that only the first episode is selected.
         test_dataset = LeRobotDataset(repo_id=repo_id, root=tmpdir / "tests/data")
         num_frames = sum(
-            i == lerobot_dataset.hf_dataset["episode_index"][0]
-            for i in lerobot_dataset.hf_dataset["episode_index"]
+            i == lerobot_dataset.hf_dataset["episode_index"][0] for i in lerobot_dataset.hf_dataset["episode_index"]
         ).item()
-        assert (
-            test_dataset.hf_dataset["episode_index"]
-            == lerobot_dataset.hf_dataset["episode_index"][:num_frames]
-        )
+        assert test_dataset.hf_dataset["episode_index"] == lerobot_dataset.hf_dataset["episode_index"][:num_frames]
         for k in ["from", "to"]:
-            assert torch.equal(test_dataset.episode_data_index[k], lerobot_dataset.episode_data_index[k][:1])
+            assert torch.equal(
+                test_dataset.episode_data_index[k],
+                lerobot_dataset.episode_data_index[k][:1],
+            )
 
 
 @pytest.mark.parametrize(

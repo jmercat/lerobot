@@ -22,13 +22,17 @@ def configure_motor(port, brand, model, motor_idx_des, baudrate_des):
         from lerobot.common.robot_devices.motors.feetech import (
             SCS_SERIES_BAUDRATE_TABLE as SERIES_BAUDRATE_TABLE,
         )
-        from lerobot.common.robot_devices.motors.feetech import FeetechMotorsBus as MotorsBusClass
+        from lerobot.common.robot_devices.motors.feetech import (
+            FeetechMotorsBus as MotorsBusClass,
+        )
     elif brand == "dynamixel":
         from lerobot.common.robot_devices.motors.dynamixel import MODEL_BAUDRATE_TABLE
         from lerobot.common.robot_devices.motors.dynamixel import (
             X_SERIES_BAUDRATE_TABLE as SERIES_BAUDRATE_TABLE,
         )
-        from lerobot.common.robot_devices.motors.dynamixel import DynamixelMotorsBus as MotorsBusClass
+        from lerobot.common.robot_devices.motors.dynamixel import (
+            DynamixelMotorsBus as MotorsBusClass,
+        )
     else:
         raise ValueError(
             f"Currently we do not support this motor brand: {brand}. We currently support feetech and dynamixel motors."
@@ -133,12 +137,25 @@ def configure_motor(port, brand, model, motor_idx_des, baudrate_des):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=str, required=True, help="Motors bus port (e.g. dynamixel,feetech)")
+    parser.add_argument(
+        "--port",
+        type=str,
+        required=True,
+        help="Motors bus port (e.g. dynamixel,feetech)",
+    )
     parser.add_argument("--brand", type=str, required=True, help="Motor brand (e.g. dynamixel,feetech)")
     parser.add_argument("--model", type=str, required=True, help="Motor model (e.g. xl330-m077,sts3215)")
-    parser.add_argument("--ID", type=int, required=True, help="Desired ID of the current motor (e.g. 1,2,3)")
     parser.add_argument(
-        "--baudrate", type=int, default=1000000, help="Desired baudrate for the motor (default: 1000000)"
+        "--ID",
+        type=int,
+        required=True,
+        help="Desired ID of the current motor (e.g. 1,2,3)",
+    )
+    parser.add_argument(
+        "--baudrate",
+        type=int,
+        default=1000000,
+        help="Desired baudrate for the motor (default: 1000000)",
     )
     args = parser.parse_args()
 

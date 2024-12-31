@@ -35,9 +35,7 @@ def make_env(cfg: DictConfig, n_envs: int | None = None) -> gym.vector.VectorEnv
     try:
         importlib.import_module(package_name)
     except ModuleNotFoundError as e:
-        print(
-            f"{package_name} is not installed. Please install it with `pip install 'lerobot[{cfg.env.name}]'`"
-        )
+        print(f"{package_name} is not installed. Please install it with `pip install 'lerobot[{cfg.env.name}]'`")
         raise e
 
     gym_handle = f"{package_name}/{cfg.env.task}"

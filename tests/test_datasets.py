@@ -102,7 +102,16 @@ def test_dataset_initialization(lerobot_dataset_factory, tmp_path):
 @pytest.mark.parametrize(
     "env_name, repo_id, policy_name",
     lerobot.env_dataset_policy_triplets
-    + [("aloha", ["lerobot/aloha_sim_insertion_human", "lerobot/aloha_sim_transfer_cube_human"], "act")],
+    + [
+        (
+            "aloha",
+            [
+                "lerobot/aloha_sim_insertion_human",
+                "lerobot/aloha_sim_transfer_cube_human",
+            ],
+            "act",
+        )
+    ],
 )
 def test_factory(env_name, repo_id, policy_name):
     """
@@ -370,7 +379,12 @@ def test_aggregate_stats():
         data_c = torch.rand(20, dtype=torch.float32)
 
     hf_dataset_1 = Dataset.from_dict(
-        {"a": data_a[:10], "b": data_b[:10], "c": data_c[:10], "index": torch.arange(10)}
+        {
+            "a": data_a[:10],
+            "b": data_b[:10],
+            "c": data_c[:10],
+            "index": torch.arange(10),
+        }
     )
     hf_dataset_1.set_transform(hf_transform_to_torch)
     hf_dataset_2 = Dataset.from_dict({"a": data_a[10:20], "b": data_b[10:], "index": torch.arange(10)})

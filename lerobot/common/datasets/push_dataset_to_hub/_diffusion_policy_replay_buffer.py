@@ -124,7 +124,13 @@ class ReplayBuffer:
         root.require_group("data", overwrite=False)
         meta = root.require_group("meta", overwrite=False)
         if "episode_ends" not in meta:
-            meta.zeros("episode_ends", shape=(0,), dtype=np.int64, compressor=None, overwrite=False)
+            meta.zeros(
+                "episode_ends",
+                shape=(0,),
+                dtype=np.int64,
+                compressor=None,
+                overwrite=False,
+            )
         return cls(root=root)
 
     @classmethod
@@ -193,7 +199,11 @@ class ReplayBuffer:
             root = zarr.group(store=store)
             # copy without recompression
             n_copied, n_skipped, n_bytes_copied = zarr.copy_store(
-                source=src_store, dest=store, source_path="/meta", dest_path="/meta", if_exists=if_exists
+                source=src_store,
+                dest=store,
+                source_path="/meta",
+                dest_path="/meta",
+                if_exists=if_exists,
             )
             data_group = root.create_group("data", overwrite=True)
             if keys is None:
@@ -332,9 +342,7 @@ class ReplayBuffer:
         if compressors is None:
             compressors = {}
         store = zarr.DirectoryStore(os.path.expanduser(zarr_path))
-        return self.save_to_store(
-            store, chunks=chunks, compressors=compressors, if_exists=if_exists, **kwargs
-        )
+        return self.save_to_store(store, chunks=chunks, compressors=compressors, if_exists=if_exists, **kwargs)
 
     @staticmethod
     def resolve_compressor(compressor="default"):
@@ -404,7 +412,11 @@ class ReplayBuffer:
         if self.backend == "zarr":
             for key, value in np_data.items():
                 _ = meta_group.array(
-                    name=key, data=value, shape=value.shape, chunks=value.shape, overwrite=True
+                    name=key,
+                    data=value,
+                    shape=value.shape,
+                    chunks=value.shape,
+                    overwrite=True,
                 )
         else:
             meta_group.update(np_data)
@@ -517,7 +529,11 @@ class ReplayBuffer:
                     cks = self._resolve_array_chunks(chunks=chunks, key=key, array=value)
                     cpr = self._resolve_array_compressor(compressors=compressors, key=key, array=value)
                     arr = self.data.zeros(
-                        name=key, shape=new_shape, chunks=cks, dtype=value.dtype, compressor=cpr
+                        name=key,
+                        shape=new_shape,
+                        chunks=cks,
+                        dtype=value.dtype,
+                        compressor=cpr,
                     )
                 else:
                     # copy data to prevent modify

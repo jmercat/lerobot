@@ -98,7 +98,11 @@ def compute_stats(dataset, batch_size=8, num_workers=8, max_num_samples=None):
     running_item_count = 0  # for online mean computation
     dataloader = create_seeded_dataloader(dataset, batch_size, seed=1337)
     for i, batch in enumerate(
-        tqdm.tqdm(dataloader, total=ceil(max_num_samples / batch_size), desc="Compute mean, min, max")
+        tqdm.tqdm(
+            dataloader,
+            total=ceil(max_num_samples / batch_size),
+            desc="Compute mean, min, max",
+        )
     ):
         this_batch_size = len(batch["index"])
         running_item_count += this_batch_size
@@ -123,9 +127,7 @@ def compute_stats(dataset, batch_size=8, num_workers=8, max_num_samples=None):
     first_batch_ = None
     running_item_count = 0  # for online std computation
     dataloader = create_seeded_dataloader(dataset, batch_size, seed=1337)
-    for i, batch in enumerate(
-        tqdm.tqdm(dataloader, total=ceil(max_num_samples / batch_size), desc="Compute std")
-    ):
+    for i, batch in enumerate(tqdm.tqdm(dataloader, total=ceil(max_num_samples / batch_size), desc="Compute std")):
         this_batch_size = len(batch["index"])
         running_item_count += this_batch_size
         # Sanity check to make sure the batches are still in the same order as before.
@@ -202,10 +204,7 @@ def aggregate_stats(ls_datasets) -> dict[str, torch.Tensor]:
         # numerical overflow!
         stats[data_key]["std"] = torch.sqrt(
             sum(
-                (
-                    d.meta.stats[data_key]["std"] ** 2
-                    + (d.meta.stats[data_key]["mean"] - stats[data_key]["mean"]) ** 2
-                )
+                (d.meta.stats[data_key]["std"] ** 2 + (d.meta.stats[data_key]["mean"] - stats[data_key]["mean"]) ** 2)
                 * (d.num_frames / total_samples)
                 for d in ls_datasets
                 if data_key in d.meta.stats

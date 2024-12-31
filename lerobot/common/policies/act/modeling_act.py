@@ -69,15 +69,9 @@ class ACTPolicy(
             config = ACTConfig()
         self.config: ACTConfig = config
 
-        self.normalize_inputs = Normalize(
-            config.input_shapes, config.input_normalization_modes, dataset_stats
-        )
-        self.normalize_targets = Normalize(
-            config.output_shapes, config.output_normalization_modes, dataset_stats
-        )
-        self.unnormalize_outputs = Unnormalize(
-            config.output_shapes, config.output_normalization_modes, dataset_stats
-        )
+        self.normalize_inputs = Normalize(config.input_shapes, config.input_normalization_modes, dataset_stats)
+        self.normalize_targets = Normalize(config.output_shapes, config.output_normalization_modes, dataset_stats)
+        self.unnormalize_outputs = Unnormalize(config.output_shapes, config.output_normalization_modes, dataset_stats)
 
         self.model = ACT(config)
 
@@ -150,9 +144,7 @@ class ACTPolicy(
             # each dimension independently, we sum over the latent dimension to get the total
             # KL-divergence per batch element, then take the mean over the batch.
             # (See App. B of https://arxiv.org/abs/1312.6114 for more details).
-            mean_kld = (
-                (-0.5 * (1 + log_sigma_x2_hat - mu_hat.pow(2) - (log_sigma_x2_hat).exp())).sum(-1).mean()
-            )
+            mean_kld = (-0.5 * (1 + log_sigma_x2_hat - mu_hat.pow(2) - (log_sigma_x2_hat).exp())).sum(-1).mean()
             loss_dict["kld_loss"] = mean_kld.item()
             loss_dict["loss"] = l1_loss + mean_kld * self.config.kl_weight
         else:
@@ -229,7 +221,9 @@ class ACTTemporalEnsembler:
             # Note: The last dimension is unsqueeze to make sure we can broadcast properly for tensor
             # operations later.
             self.ensembled_actions_count = torch.ones(
-                (self.chunk_size, 1), dtype=torch.long, device=self.ensembled_actions.device
+                (self.chunk_size, 1),
+                dtype=torch.long,
+                device=self.ensembled_actions.device,
             )
         else:
             # self.ensembled_actions will have shape (batch_size, chunk_size - 1, action_dim). Compute
@@ -241,7 +235,10 @@ class ACTTemporalEnsembler:
             # The last action, which has no prior online average, needs to get concatenated onto the end.
             self.ensembled_actions = torch.cat([self.ensembled_actions, actions[:, -1:]], dim=1)
             self.ensembled_actions_count = torch.cat(
-                [self.ensembled_actions_count, torch.ones_like(self.ensembled_actions_count[-1:])]
+                [
+                    self.ensembled_actions_count,
+                    torch.ones_like(self.ensembled_actions_count[-1:]),
+                ]
             )
         # "Consume" the first action.
         action, self.ensembled_actions, self.ensembled_actions_count = (
@@ -304,9 +301,7 @@ class ACT(nn.Module):
                     config.input_shapes["observation.state"][0], config.dim_model
                 )
             # Projection layer for action (joint-space target) to hidden dimension.
-            self.vae_encoder_action_input_proj = nn.Linear(
-                config.output_shapes["action"][0], config.dim_model
-            )
+            self.vae_encoder_action_input_proj = nn.Linear(config.output_shapes["action"][0], config.dim_model)
             # Projection layer from the VAE encoder's output to the latent distribution's parameter space.
             self.vae_encoder_latent_output_proj = nn.Linear(config.dim_model, config.latent_dim * 2)
             # Fixed sinusoidal positional embedding for the input to the VAE encoder. Unsqueeze for batch
@@ -322,7 +317,11 @@ class ACT(nn.Module):
         # Backbone for image feature extraction.
         if self.use_images:
             backbone_model = getattr(torchvision.models, config.vision_backbone)(
-                replace_stride_with_dilation=[False, False, config.replace_final_stride_with_dilation],
+                replace_stride_with_dilation=[
+                    False,
+                    False,
+                    config.replace_final_stride_with_dilation,
+                ],
                 weights=config.pretrained_backbone_weights,
                 norm_layer=FrozenBatchNorm2d,
             )
@@ -343,13 +342,12 @@ class ACT(nn.Module):
             )
         if self.use_env_state:
             self.encoder_env_state_input_proj = nn.Linear(
-                config.input_shapes["observation.environment_state"][0], config.dim_model
+                config.input_shapes["observation.environment_state"][0],
+                config.dim_model,
             )
         self.encoder_latent_input_proj = nn.Linear(config.latent_dim, config.dim_model)
         if self.use_images:
-            self.encoder_img_feat_input_proj = nn.Conv2d(
-                backbone_model.fc.in_features, config.dim_model, kernel_size=1
-            )
+            self.encoder_img_feat_input_proj = nn.Conv2d(backbone_model.fc.in_features, config.dim_model, kernel_size=1)
         # Transformer encoder positional embeddings.
         n_1d_tokens = 1  # for the latent
         if self.use_robot_state:
@@ -395,29 +393,27 @@ class ACT(nn.Module):
             latent dimension.
         """
         if self.config.use_vae and self.training:
-            assert (
-                "action" in batch
-            ), "actions must be provided when using the variational objective in training mode."
+            assert "action" in batch, "actions must be provided when using the variational objective in training mode."
 
         batch_size = (
-            batch["observation.images"]
-            if "observation.images" in batch
-            else batch["observation.environment_state"]
+            batch["observation.images"] if "observation.images" in batch else batch["observation.environment_state"]
         ).shape[0]
 
         # Prepare the latent for input to the transformer encoder.
         if self.config.use_vae and "action" in batch:
             # Prepare the input to the VAE encoder: [cls, *joint_space_configuration, *action_sequence].
-            cls_embed = einops.repeat(
-                self.vae_encoder_cls_embed.weight, "1 d -> b 1 d", b=batch_size
-            )  # (B, 1, D)
+            cls_embed = einops.repeat(self.vae_encoder_cls_embed.weight, "1 d -> b 1 d", b=batch_size)  # (B, 1, D)
             if self.use_robot_state:
                 robot_state_embed = self.vae_encoder_robot_state_input_proj(batch["observation.state"])
                 robot_state_embed = robot_state_embed.unsqueeze(1)  # (B, 1, D)
             action_embed = self.vae_encoder_action_input_proj(batch["action"])  # (B, S, D)
 
             if self.use_robot_state:
-                vae_encoder_input = [cls_embed, robot_state_embed, action_embed]  # (B, S+2, D)
+                vae_encoder_input = [
+                    cls_embed,
+                    robot_state_embed,
+                    action_embed,
+                ]  # (B, S+2, D)
             else:
                 vae_encoder_input = [cls_embed, action_embed]
             vae_encoder_input = torch.cat(vae_encoder_input, axis=1)
@@ -434,16 +430,16 @@ class ACT(nn.Module):
                 False,
                 device=batch["observation.state"].device,
             )
-            key_padding_mask = torch.cat(
-                [cls_joint_is_pad, batch["action_is_pad"]], axis=1
-            )  # (bs, seq+1 or 2)
+            key_padding_mask = torch.cat([cls_joint_is_pad, batch["action_is_pad"]], axis=1)  # (bs, seq+1 or 2)
 
             # Forward pass through VAE encoder to get the latent PDF parameters.
             cls_token_out = self.vae_encoder(
                 vae_encoder_input.permute(1, 0, 2),
                 pos_embed=pos_embed.permute(1, 0, 2),
                 key_padding_mask=key_padding_mask,
-            )[0]  # select the class token, with shape (B, D)
+            )[
+                0
+            ]  # select the class token, with shape (B, D)
             latent_pdf_params = self.vae_encoder_latent_output_proj(cls_token_out)
             mu = latent_pdf_params[:, : self.config.latent_dim]
             # This is 2log(sigma). Done this way to match the original implementation.
@@ -467,9 +463,7 @@ class ACT(nn.Module):
             encoder_in_tokens.append(self.encoder_robot_state_input_proj(batch["observation.state"]))
         # Environment state token.
         if self.use_env_state:
-            encoder_in_tokens.append(
-                self.encoder_env_state_input_proj(batch["observation.environment_state"])
-            )
+            encoder_in_tokens.append(self.encoder_env_state_input_proj(batch["observation.environment_state"]))
 
         # Camera observation features and positional embeddings.
         if self.use_images:
@@ -529,7 +523,10 @@ class ACTEncoder(nn.Module):
         self.norm = nn.LayerNorm(config.dim_model) if config.pre_norm else nn.Identity()
 
     def forward(
-        self, x: Tensor, pos_embed: Tensor | None = None, key_padding_mask: Tensor | None = None
+        self,
+        x: Tensor,
+        pos_embed: Tensor | None = None,
+        key_padding_mask: Tensor | None = None,
     ) -> Tensor:
         for layer in self.layers:
             x = layer(x, pos_embed=pos_embed, key_padding_mask=key_padding_mask)
@@ -592,7 +589,10 @@ class ACTDecoder(nn.Module):
     ) -> Tensor:
         for layer in self.layers:
             x = layer(
-                x, encoder_out, decoder_pos_embed=decoder_pos_embed, encoder_pos_embed=encoder_pos_embed
+                x,
+                encoder_out,
+                decoder_pos_embed=decoder_pos_embed,
+                encoder_pos_embed=encoder_pos_embed,
             )
         if self.norm is not None:
             x = self.norm(x)
@@ -656,7 +656,9 @@ class ACTDecoderLayer(nn.Module):
             query=self.maybe_add_pos_embed(x, decoder_pos_embed),
             key=self.maybe_add_pos_embed(encoder_out, encoder_pos_embed),
             value=encoder_out,
-        )[0]  # select just the output, not the attention weights
+        )[
+            0
+        ]  # select just the output, not the attention weights
         x = skip + self.dropout2(x)
         if self.pre_norm:
             skip = x

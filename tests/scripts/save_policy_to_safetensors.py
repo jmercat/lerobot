@@ -59,9 +59,7 @@ def get_policy_stats(env_name, policy_name, extra_overrides):
     for key, param in policy.named_parameters():
         if param.requires_grad:
             grad_stats[f"{key}_mean"] = param.grad.mean()
-            grad_stats[f"{key}_std"] = (
-                param.grad.std() if param.grad.numel() > 1 else torch.tensor(float(0.0))
-            )
+            grad_stats[f"{key}_std"] = param.grad.std() if param.grad.numel() > 1 else torch.tensor(float(0.0))
 
     optimizer.step()
     param_stats = {}
@@ -129,5 +127,9 @@ if __name__ == "__main__":
         raise RuntimeError("No policies were provided!")
     for env, policy, extra_overrides, file_name_extra in env_policies:
         save_policy_to_safetensors(
-            "tests/data/save_policy_to_safetensors", env, policy, extra_overrides, file_name_extra
+            "tests/data/save_policy_to_safetensors",
+            env,
+            policy,
+            extra_overrides,
+            file_name_extra,
         )

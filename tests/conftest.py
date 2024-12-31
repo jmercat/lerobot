@@ -38,9 +38,7 @@ def pytest_collection_finish():
 @pytest.fixture
 def is_robot_available(robot_type):
     if robot_type not in available_robots:
-        raise ValueError(
-            f"The robot type '{robot_type}' is not valid. Expected one of these '{available_robots}"
-        )
+        raise ValueError(f"The robot type '{robot_type}' is not valid. Expected one of these '{available_robots}")
 
     try:
         from lerobot.common.robot_devices.robots.factory import make_robot
@@ -68,9 +66,7 @@ def is_robot_available(robot_type):
 @pytest.fixture
 def is_camera_available(camera_type):
     if camera_type not in available_cameras:
-        raise ValueError(
-            f"The camera type '{camera_type}' is not valid. Expected one of these '{available_cameras}"
-        )
+        raise ValueError(f"The camera type '{camera_type}' is not valid. Expected one of these '{available_cameras}")
 
     try:
         camera = make_camera(camera_type)
@@ -94,9 +90,7 @@ def is_camera_available(camera_type):
 @pytest.fixture
 def is_motor_available(motor_type):
     if motor_type not in available_motors:
-        raise ValueError(
-            f"The motor type '{motor_type}' is not valid. Expected one of these '{available_motors}"
-        )
+        raise ValueError(f"The motor type '{motor_type}' is not valid. Expected one of these '{available_motors}")
 
     try:
         motors_bus = make_motors_bus(motor_type)

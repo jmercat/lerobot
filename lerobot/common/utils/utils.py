@@ -155,7 +155,8 @@ def _relative_path_between(path1: Path, path2: Path) -> Path:
     except ValueError:  # most likely because path1 is not a subpath of path2
         common_parts = Path(osp.commonpath([path1, path2])).parts
         return Path(
-            "/".join([".."] * (len(path2.parts) - len(common_parts)) + list(path1.parts[len(common_parts) :]))
+            "/".join([".."] * (len(path2.parts) - len(common_parts))
+                     + list(path1.parts[len(common_parts):]))
         )
 
 

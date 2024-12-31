@@ -81,7 +81,11 @@ def run_server(
     static_folder: Path,
     template_folder: Path,
 ):
-    app = Flask(__name__, static_folder=static_folder.resolve(), template_folder=template_folder.resolve())
+    app = Flask(
+        __name__,
+        static_folder=static_folder.resolve(),
+        template_folder=template_folder.resolve(),
+    )
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0  # specifying not to cache
 
     @app.route("/")
@@ -149,9 +153,7 @@ def run_server(
                 "Make sure to convert your LeRobotDataset to v2 & above. See how to convert your dataset at https://github.com/huggingface/lerobot/pull/461",
                 400,
             )
-        dataset_version = (
-            dataset.meta._version if isinstance(dataset, LeRobotDataset) else dataset.codebase_version
-        )
+        dataset_version = dataset.meta._version if isinstance(dataset, LeRobotDataset) else dataset.codebase_version
         match = re.search(r"v(\d+)\.", dataset_version)
         if match:
             major_version = int(match.group(1))
@@ -161,20 +163,17 @@ def run_server(
         episode_data_csv_str, columns = get_episode_data(dataset, episode_id)
         dataset_info = {
             "repo_id": f"{dataset_namespace}/{dataset_name}",
-            "num_samples": dataset.num_frames
-            if isinstance(dataset, LeRobotDataset)
-            else dataset.total_frames,
-            "num_episodes": dataset.num_episodes
-            if isinstance(dataset, LeRobotDataset)
-            else dataset.total_episodes,
+            "num_samples": dataset.num_frames if isinstance(dataset, LeRobotDataset) else dataset.total_frames,
+            "num_episodes": dataset.num_episodes if isinstance(dataset, LeRobotDataset) else dataset.total_episodes,
             "fps": dataset.fps,
         }
         if isinstance(dataset, LeRobotDataset):
-            video_paths = [
-                dataset.meta.get_video_file_path(episode_id, key) for key in dataset.meta.video_keys
-            ]
+            video_paths = [dataset.meta.get_video_file_path(episode_id, key) for key in dataset.meta.video_keys]
             videos_info = [
-                {"url": url_for("static", filename=video_path), "filename": video_path.parent.name}
+                {
+                    "url": url_for("static", filename=video_path),
+                    "filename": video_path.parent.name,
+                }
                 for video_path in video_paths
             ]
             tasks = dataset.meta.episodes[0]["tasks"]
@@ -193,9 +192,7 @@ def run_server(
                 for video_key in video_keys
             ]
 
-            response = requests.get(
-                f"https://huggingface.co/datasets/{repo_id}/resolve/main/meta/episodes.jsonl"
-            )
+            response = requests.get(f"https://huggingface.co/datasets/{repo_id}/resolve/main/meta/episodes.jsonl")
             response.raise_for_status()
             # Split into lines and parse each line as JSON
             tasks_jsonl = [json.loads(line) for line in response.text.splitlines() if line.strip()]
@@ -268,13 +265,12 @@ def get_episode_data(dataset: LeRobotDataset | IterableNamespace, episode_index)
             selected_columns += ["observation.state"]
         if has_action:
             selected_columns += ["action"]
-        data = (
-            dataset.hf_dataset.select(range(from_idx, to_idx))
-            .select_columns(selected_columns)
-            .with_format("numpy")
-        )
+        data = dataset.hf_dataset.select(range(from_idx, to_idx)).select_columns(selected_columns).with_format("numpy")
         rows = np.hstack(
-            (np.expand_dims(data["timestamp"], axis=1), *[data[col] for col in selected_columns[1:]])
+            (
+                np.expand_dims(data["timestamp"], axis=1),
+                *[data[col] for col in selected_columns[1:]],
+            )
         ).tolist()
     else:
         repo_id = dataset.repo_id
@@ -285,7 +281,8 @@ def get_episode_data(dataset: LeRobotDataset | IterableNamespace, episode_index)
             selected_columns.append("action")
 
         url = f"https://huggingface.co/datasets/{repo_id}/resolve/main/" + dataset.data_path.format(
-            episode_chunk=int(episode_index) // dataset.chunks_size, episode_index=episode_index
+            episode_chunk=int(episode_index) // dataset.chunks_size,
+            episode_index=episode_index,
         )
         df = pd.read_parquet(url)
         data = df[selected_columns]  # Select specific columns
@@ -311,10 +308,7 @@ def get_episode_data(dataset: LeRobotDataset | IterableNamespace, episode_index)
 def get_episode_video_paths(dataset: LeRobotDataset, ep_index: int) -> list[str]:
     # get first frame of episode (hack to get video_path of the episode)
     first_frame_idx = dataset.episode_data_index["from"][ep_index].item()
-    return [
-        dataset.hf_dataset.select_columns(key)[first_frame_idx][key]["path"]
-        for key in dataset.meta.video_keys
-    ]
+    return [dataset.hf_dataset.select_columns(key)[first_frame_idx][key]["path"] for key in dataset.meta.video_keys]
 
 
 def get_episode_language_instruction(dataset: LeRobotDataset, ep_index: int) -> list[str]:

@@ -8,7 +8,11 @@ import PIL.Image
 import pytest
 import torch
 
-from lerobot.common.datasets.lerobot_dataset import CODEBASE_VERSION, LeRobotDataset, LeRobotDatasetMetadata
+from lerobot.common.datasets.lerobot_dataset import (
+    CODEBASE_VERSION,
+    LeRobotDataset,
+    LeRobotDatasetMetadata,
+)
 from lerobot.common.datasets.utils import (
     DEFAULT_CHUNK_SIZE,
     DEFAULT_FEATURES,
@@ -74,9 +78,7 @@ def features_factory():
         use_videos: bool = True,
     ) -> dict:
         if use_videos:
-            camera_ft = {
-                key: {"dtype": "video", **ft, **DUMMY_VIDEO_INFO} for key, ft in camera_features.items()
-            }
+            camera_ft = {key: {"dtype": "video", **ft, **DUMMY_VIDEO_INFO} for key, ft in camera_features.items()}
         else:
             camera_ft = {key: {"dtype": "image", **ft} for key, ft in camera_features.items()}
         return {
@@ -239,7 +241,10 @@ def hf_dataset_factory(features_factory, tasks_factory, episodes_factory, img_ar
             timestamp_col = np.concatenate((timestamp_col, np.arange(ep_dict["length"]) / fps))
             frame_index_col = np.concatenate((frame_index_col, np.arange(ep_dict["length"], dtype=int)))
             episode_index_col = np.concatenate(
-                (episode_index_col, np.full(ep_dict["length"], ep_dict["episode_index"], dtype=int))
+                (
+                    episode_index_col,
+                    np.full(ep_dict["length"], ep_dict["episode_index"], dtype=int),
+                )
             )
             ep_task_index = get_task_index(tasks, ep_dict["tasks"][0])
             task_index = np.concatenate((task_index, np.full(ep_dict["length"], ep_task_index, dtype=int)))
@@ -250,8 +255,7 @@ def hf_dataset_factory(features_factory, tasks_factory, episodes_factory, img_ar
         for key, ft in features.items():
             if ft["dtype"] == "image":
                 robot_cols[key] = [
-                    img_array_factory(height=ft["shapes"][1], width=ft["shapes"][0])
-                    for _ in range(len(index_col))
+                    img_array_factory(height=ft["shapes"][1], width=ft["shapes"][0]) for _ in range(len(index_col))
                 ]
             elif ft["shape"][0] > 1 and ft["dtype"] != "video":
                 robot_cols[key] = np.random.random((len(index_col), ft["shape"][0])).astype(ft["dtype"])
@@ -299,7 +303,9 @@ def lerobot_dataset_metadata_factory(
             tasks = tasks_factory(total_tasks=info["total_tasks"])
         if not episodes:
             episodes = episodes_factory(
-                total_episodes=info["total_episodes"], total_frames=info["total_frames"], tasks=tasks
+                total_episodes=info["total_episodes"],
+                total_frames=info["total_frames"],
+                tasks=tasks,
             )
 
         mock_snapshot_download = mock_snapshot_download_factory(
@@ -309,12 +315,8 @@ def lerobot_dataset_metadata_factory(
             episodes=episodes,
         )
         with (
-            patch(
-                "lerobot.common.datasets.lerobot_dataset.get_hub_safe_version"
-            ) as mock_get_hub_safe_version_patch,
-            patch(
-                "lerobot.common.datasets.lerobot_dataset.snapshot_download"
-            ) as mock_snapshot_download_patch,
+            patch("lerobot.common.datasets.lerobot_dataset.get_hub_safe_version") as mock_get_hub_safe_version_patch,
+            patch("lerobot.common.datasets.lerobot_dataset.snapshot_download") as mock_snapshot_download_patch,
         ):
             mock_get_hub_safe_version_patch.side_effect = lambda repo_id, version: version
             mock_snapshot_download_patch.side_effect = mock_snapshot_download
@@ -350,7 +352,9 @@ def lerobot_dataset_factory(
     ) -> LeRobotDataset:
         if not info:
             info = info_factory(
-                total_episodes=total_episodes, total_frames=total_frames, total_tasks=total_tasks
+                total_episodes=total_episodes,
+                total_frames=total_frames,
+                total_tasks=total_tasks,
             )
         if not stats:
             stats = stats_factory(features=info["features"])
@@ -384,9 +388,7 @@ def lerobot_dataset_factory(
         )
         with (
             patch("lerobot.common.datasets.lerobot_dataset.LeRobotDatasetMetadata") as mock_metadata_patch,
-            patch(
-                "lerobot.common.datasets.lerobot_dataset.snapshot_download"
-            ) as mock_snapshot_download_patch,
+            patch("lerobot.common.datasets.lerobot_dataset.snapshot_download") as mock_snapshot_download_patch,
         ):
             mock_metadata_patch.return_value = mock_metadata
             mock_snapshot_download_patch.side_effect = mock_snapshot_download

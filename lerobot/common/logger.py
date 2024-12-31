@@ -205,7 +205,9 @@ class Logger:
             else f"{self._group.replace(':', '_').replace('/', '_')}-{self._cfg.seed}-{identifier}"
         )
         self.save_model(
-            checkpoint_dir / self.pretrained_model_dir_name, policy, wandb_artifact_name=wandb_artifact_name
+            checkpoint_dir / self.pretrained_model_dir_name,
+            policy,
+            wandb_artifact_name=wandb_artifact_name,
         )
         self.save_training_state(checkpoint_dir, train_step, optimizer, scheduler)
         os.symlink(checkpoint_dir.absolute(), self.last_checkpoint_dir)
@@ -220,9 +222,7 @@ class Logger:
         if scheduler is not None:
             scheduler.load_state_dict(training_state["scheduler"])
         elif "scheduler" in training_state:
-            raise ValueError(
-                "The checkpoint contains a scheduler state_dict, but no LRScheduler was provided."
-            )
+            raise ValueError("The checkpoint contains a scheduler state_dict, but no LRScheduler was provided.")
         # Small hack to get the expected keys: use `get_global_random_state`.
         set_global_random_state({k: training_state[k] for k in get_global_random_state()})
         return training_state["step"]

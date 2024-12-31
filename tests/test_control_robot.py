@@ -35,7 +35,13 @@ from lerobot.common.utils.utils import init_hydra_config
 from lerobot.scripts.control_robot import calibrate, record, replay, teleoperate
 from lerobot.scripts.train import make_optimizer_and_scheduler
 from tests.test_robots import make_robot
-from tests.utils import DEFAULT_CONFIG_PATH, DEVICE, TEST_ROBOT_TYPES, mock_calibration_dir, require_robot
+from tests.utils import (
+    DEFAULT_CONFIG_PATH,
+    DEVICE,
+    TEST_ROBOT_TYPES,
+    mock_calibration_dir,
+    require_robot,
+)
 
 
 @pytest.mark.parametrize("robot_type, mock", TEST_ROBOT_TYPES)
@@ -158,7 +164,15 @@ def test_record_and_replay_and_policy(tmpdir, request, robot_type, mock):
     assert dataset.meta.total_episodes == 2
     assert len(dataset) == 2
 
-    replay(robot, episode=0, fps=1, root=root, repo_id=repo_id, play_sounds=False, local_files_only=True)
+    replay(
+        robot,
+        episode=0,
+        fps=1,
+        root=root,
+        repo_id=repo_id,
+        play_sounds=False,
+        local_files_only=True,
+    )
 
     # TODO(rcadene, aliberts): rethink this design
     if robot_type == "aloha":
@@ -399,7 +413,8 @@ def test_record_with_event_exit_early(tmpdir, request, robot_type, mock):
 
 
 @pytest.mark.parametrize(
-    "robot_type, mock, num_image_writer_processes", [("koch", True, 0), ("koch", True, 1)]
+    "robot_type, mock, num_image_writer_processes",
+    [("koch", True, 0), ("koch", True, 1)],
 )
 @require_robot
 def test_record_with_event_stop_recording(tmpdir, request, robot_type, mock, num_image_writer_processes):

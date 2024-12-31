@@ -68,7 +68,9 @@ class TDMPCPolicy(
     name = "tdmpc"
 
     def __init__(
-        self, config: TDMPCConfig | None = None, dataset_stats: dict[str, dict[str, Tensor]] | None = None
+        self,
+        config: TDMPCConfig | None = None,
+        dataset_stats: dict[str, dict[str, Tensor]] | None = None,
     ):
         """
         Args:
@@ -88,17 +90,11 @@ class TDMPCPolicy(
             param.requires_grad = False
 
         if config.input_normalization_modes is not None:
-            self.normalize_inputs = Normalize(
-                config.input_shapes, config.input_normalization_modes, dataset_stats
-            )
+            self.normalize_inputs = Normalize(config.input_shapes, config.input_normalization_modes, dataset_stats)
         else:
             self.normalize_inputs = nn.Identity()
-        self.normalize_targets = Normalize(
-            config.output_shapes, config.output_normalization_modes, dataset_stats
-        )
-        self.unnormalize_outputs = Unnormalize(
-            config.output_shapes, config.output_normalization_modes, dataset_stats
-        )
+        self.normalize_targets = Normalize(config.output_shapes, config.output_normalization_modes, dataset_stats)
+        self.unnormalize_outputs = Unnormalize(config.output_shapes, config.output_normalization_modes, dataset_stats)
 
         image_keys = [k for k in config.input_shapes if k.startswith("observation.image")]
         # Note: This check is covered in the post-init of the config but have a sanity check just in case.
@@ -209,13 +205,20 @@ class TDMPCPolicy(
 
         # In the CEM loop we will need this for a call to estimate_value with the gaussian sampled
         # trajectories.
-        z = einops.repeat(z, "b d -> n b d", n=self.config.n_gaussian_samples + self.config.n_pi_samples)
+        z = einops.repeat(
+            z,
+            "b d -> n b d",
+            n=self.config.n_gaussian_samples + self.config.n_pi_samples,
+        )
 
         # Model Predictive Path Integral (MPPI) with the cross-entropy method (CEM) as the optimization
         # algorithm.
         # The initial mean and standard deviation for the cross-entropy method (CEM).
         mean = torch.zeros(
-            self.config.horizon, batch_size, self.config.output_shapes["action"][0], device=device
+            self.config.horizon,
+            batch_size,
+            self.config.output_shapes["action"][0],
+            device=device,
         )
         # Maybe warm start CEM with the mean from the previous step.
         if self._prev_mean is not None:
@@ -258,9 +261,7 @@ class TDMPCPolicy(
                 )
             )
             # Update mean with an exponential moving average, and std with a direct replacement.
-            mean = (
-                self.config.gaussian_mean_momentum * mean + (1 - self.config.gaussian_mean_momentum) * _mean
-            )
+            mean = self.config.gaussian_mean_momentum * mean + (1 - self.config.gaussian_mean_momentum) * _mean
             std = _std.clamp_(self.config.min_std, self.config.max_std)
 
         # Keep track of the mean for warm-starting subsequent steps.
@@ -290,9 +291,7 @@ class TDMPCPolicy(
             # We will compute the reward in a moment. First compute the uncertainty regularizer from eqn 4
             # of the FOWM paper.
             if self.config.uncertainty_regularizer_coeff > 0:
-                regularization = -(
-                    self.config.uncertainty_regularizer_coeff * self.model.Qs(z, actions[t]).std(0)
-                )
+                regularization = -(self.config.uncertainty_regularizer_coeff * self.model.Qs(z, actions[t]).std(0))
             else:
                 regularization = 0
             # Estimate the next state (latent) and reward.
@@ -311,9 +310,10 @@ class TDMPCPolicy(
         if self.config.q_ensemble_size > 2:
             G += (
                 running_discount
-                * torch.min(terminal_values[torch.randint(0, self.config.q_ensemble_size, size=(2,))], dim=0)[
-                    0
-                ]
+                * torch.min(
+                    terminal_values[torch.randint(0, self.config.q_ensemble_size, size=(2,))],
+                    dim=0,
+                )[0]
             )
         else:
             G += running_discount * torch.min(terminal_values, dim=0)[0]
@@ -349,7 +349,10 @@ class TDMPCPolicy(
         # Apply random image augmentations.
         if self._use_image and self.config.max_random_shift_ratio > 0:
             observations["observation.image"] = flatten_forward_unflatten(
-                partial(random_shifts_aug, max_random_shift_ratio=self.config.max_random_shift_ratio),
+                partial(
+                    random_shifts_aug,
+                    max_random_shift_ratio=self.config.max_random_shift_ratio,
+                ),
                 observations["observation.image"],
             )
 
@@ -436,7 +439,9 @@ class TDMPCPolicy(
                     q_preds_ensemble,
                     einops.repeat(q_targets, "t b -> e t b", e=q_preds_ensemble.shape[0]),
                     reduction="none",
-                ).sum(0)  # sum over ensemble
+                ).sum(
+                    0
+                )  # sum over ensemble
                 # `q_preds_ensemble` depends on the first observation and the actions.
                 * ~batch["observation.state_is_pad"][0]
                 * ~batch["action_is_pad"]
@@ -452,9 +457,9 @@ class TDMPCPolicy(
         # Expectile loss penalizes:
         #   - `v_preds <  v_targets` with weighting `expectile_weight`
         #   - `v_preds >= v_targets` with weighting `1 - expectile_weight`
-        raw_v_value_loss = torch.where(
-            diff > 0, self.config.expectile_weight, (1 - self.config.expectile_weight)
-        ) * (diff**2)
+        raw_v_value_loss = torch.where(diff > 0, self.config.expectile_weight, (1 - self.config.expectile_weight)) * (
+            diff**2
+        )
         v_value_loss = (
             (
                 temporal_loss_coeffs
@@ -472,9 +477,7 @@ class TDMPCPolicy(
         z_preds = z_preds.detach()
         # Use stopgrad for the advantage calculation.
         with torch.no_grad():
-            advantage = self.model_target.Qs(z_preds[:-1], action, return_min=True) - self.model.V(
-                z_preds[:-1]
-            )
+            advantage = self.model_target.Qs(z_preds[:-1], action, return_min=True) - self.model.V(z_preds[:-1])
             info["advantage"] = advantage[0]
             # (t, b)
             exp_advantage = torch.clamp(torch.exp(advantage * self.config.advantage_scaling), max=100.0)
@@ -574,7 +577,10 @@ class TDMPCTOLD(nn.Module):
         self._Qs = nn.ModuleList(
             [
                 nn.Sequential(
-                    nn.Linear(config.latent_dim + config.output_shapes["action"][0], config.mlp_dim),
+                    nn.Linear(
+                        config.latent_dim + config.output_shapes["action"][0],
+                        config.mlp_dim,
+                    ),
                     nn.LayerNorm(config.mlp_dim),
                     nn.Tanh(),
                     nn.Linear(config.mlp_dim, config.mlp_dim),
@@ -717,14 +723,32 @@ class TDMPCObservationEncoder(nn.Module):
         if "observation.image" in config.input_shapes:
             self.image_enc_layers = nn.Sequential(
                 nn.Conv2d(
-                    config.input_shapes["observation.image"][0], config.image_encoder_hidden_dim, 7, stride=2
+                    config.input_shapes["observation.image"][0],
+                    config.image_encoder_hidden_dim,
+                    7,
+                    stride=2,
                 ),
                 nn.ReLU(),
-                nn.Conv2d(config.image_encoder_hidden_dim, config.image_encoder_hidden_dim, 5, stride=2),
+                nn.Conv2d(
+                    config.image_encoder_hidden_dim,
+                    config.image_encoder_hidden_dim,
+                    5,
+                    stride=2,
+                ),
                 nn.ReLU(),
-                nn.Conv2d(config.image_encoder_hidden_dim, config.image_encoder_hidden_dim, 3, stride=2),
+                nn.Conv2d(
+                    config.image_encoder_hidden_dim,
+                    config.image_encoder_hidden_dim,
+                    3,
+                    stride=2,
+                ),
                 nn.ReLU(),
-                nn.Conv2d(config.image_encoder_hidden_dim, config.image_encoder_hidden_dim, 3, stride=2),
+                nn.Conv2d(
+                    config.image_encoder_hidden_dim,
+                    config.image_encoder_hidden_dim,
+                    3,
+                    stride=2,
+                ),
                 nn.ReLU(),
             )
             dummy_batch = torch.zeros(1, *config.input_shapes["observation.image"])
@@ -740,7 +764,10 @@ class TDMPCObservationEncoder(nn.Module):
             )
         if "observation.state" in config.input_shapes:
             self.state_enc_layers = nn.Sequential(
-                nn.Linear(config.input_shapes["observation.state"][0], config.state_encoder_hidden_dim),
+                nn.Linear(
+                    config.input_shapes["observation.state"][0],
+                    config.state_encoder_hidden_dim,
+                ),
                 nn.ELU(),
                 nn.Linear(config.state_encoder_hidden_dim, config.latent_dim),
                 nn.LayerNorm(config.latent_dim),
@@ -749,7 +776,8 @@ class TDMPCObservationEncoder(nn.Module):
         if "observation.environment_state" in config.input_shapes:
             self.env_state_enc_layers = nn.Sequential(
                 nn.Linear(
-                    config.input_shapes["observation.environment_state"][0], config.state_encoder_hidden_dim
+                    config.input_shapes["observation.environment_state"][0],
+                    config.state_encoder_hidden_dim,
                 ),
                 nn.ELU(),
                 nn.Linear(config.state_encoder_hidden_dim, config.latent_dim),
@@ -811,7 +839,9 @@ def update_ema_parameters(ema_net: nn.Module, net: nn.Module, alpha: float):
     """Update EMA parameters in place with ema_param <- alpha * ema_param + (1 - alpha) * param."""
     for ema_module, module in zip(ema_net.modules(), net.modules(), strict=True):
         for (n_p_ema, p_ema), (n_p, p) in zip(
-            ema_module.named_parameters(recurse=False), module.named_parameters(recurse=False), strict=True
+            ema_module.named_parameters(recurse=False),
+            module.named_parameters(recurse=False),
+            strict=True,
         ):
             assert n_p_ema == n_p, "Parameter names don't match for EMA model update"
             if isinstance(p, dict):

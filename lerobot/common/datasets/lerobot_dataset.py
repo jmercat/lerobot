@@ -299,9 +299,7 @@ class LeRobotDatasetMetadata:
                     "In this case, frames from lower fps cameras will be repeated to fill in the blanks."
                 )
         elif features is None:
-            raise ValueError(
-                "Dataset features must either come from a Robot or explicitly passed upon creation."
-            )
+            raise ValueError("Dataset features must either come from a Robot or explicitly passed upon creation.")
         else:
             # TODO(aliberts, rcadene): implement sanity check for features
             features = {**features, **DEFAULT_FEATURES}
@@ -496,9 +494,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
             repo_type="dataset",
             ignore_patterns=ignore_patterns,
         )
-        card = create_lerobot_dataset_card(
-            tags=tags, dataset_info=self.meta.info, license=license, **card_kwargs
-        )
+        card = create_lerobot_dataset_card(tags=tags, dataset_info=self.meta.info, license=license, **card_kwargs)
         card.push_to_hub(repo_id=self.repo_id, repo_type="dataset")
         create_branch(repo_id=self.repo_id, branch=CODEBASE_VERSION, repo_type="dataset")
 
@@ -626,9 +622,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         item = {}
         for vid_key, query_ts in query_timestamps.items():
             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
-            frames = decode_video_frames_torchvision(
-                video_path, query_ts, self.tolerance_s, self.video_backend
-            )
+            frames = decode_video_frames_torchvision(video_path, query_ts, self.tolerance_s, self.video_backend)
             item[vid_key] = frames.squeeze(0)
 
         return item
@@ -686,9 +680,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         }
 
     def _get_image_file_path(self, episode_index: int, image_key: str, frame_index: int) -> Path:
-        fpath = DEFAULT_IMAGE_PATH.format(
-            image_key=image_key, episode_index=episode_index, frame_index=frame_index
-        )
+        fpath = DEFAULT_IMAGE_PATH.format(image_key=image_key, episode_index=episode_index, frame_index=frame_index)
         return self.root / fpath
 
     def _save_image(self, image: torch.Tensor | np.ndarray | PIL.Image.Image, fpath: Path) -> None:
@@ -725,7 +717,9 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 self.episode_buffer[key].append(item)
             elif self.features[key]["dtype"] in ["image", "video"]:
                 img_path = self._get_image_file_path(
-                    episode_index=self.episode_buffer["episode_index"], image_key=key, frame_index=frame_index
+                    episode_index=self.episode_buffer["episode_index"],
+                    image_key=key,
+                    frame_index=frame_index,
                 )
                 if frame_index == 0:
                     img_path.parent.mkdir(parents=True, exist_ok=True)
@@ -757,9 +751,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
             )
 
         if episode_length == 0:
-            raise ValueError(
-                "You must add one or several frames with `add_frame` before calling `add_episode`."
-            )
+            raise ValueError("You must add one or several frames with `add_frame` before calling `add_episode`.")
 
         task_index = self.meta.get_task_index(task)
 
@@ -768,9 +760,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
         for key, ft in self.features.items():
             if key == "index":
-                episode_buffer[key] = np.arange(
-                    self.meta.total_frames, self.meta.total_frames + episode_length
-                )
+                episode_buffer[key] = np.arange(self.meta.total_frames, self.meta.total_frames + episode_length)
             elif key == "episode_index":
                 episode_buffer[key] = np.full((episode_length,), episode_index)
             elif key == "task_index":
@@ -866,9 +856,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
             if video_path.is_file():
                 # Skip if video is already encoded. Could be the case when resuming data recording.
                 continue
-            img_dir = self._get_image_file_path(
-                episode_index=episode_index, image_key=key, frame_index=0
-            ).parent
+            img_dir = self._get_image_file_path(episode_index=episode_index, image_key=key, frame_index=0).parent
             encode_video_frames(img_dir, video_path, self.fps, overwrite=True)
 
         return video_paths
@@ -901,9 +889,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
             write_json(serialized_stats, self.root / STATS_PATH)
             self.consolidated = True
         else:
-            logging.warning(
-                "Skipping computation of the dataset statistics, dataset is not fully consolidated."
-            )
+            logging.warning("Skipping computation of the dataset statistics, dataset is not fully consolidated.")
 
     @classmethod
     def create(
@@ -1014,8 +1000,7 @@ class MultiLeRobotDataset(torch.utils.data.Dataset):
         for repo_id, ds in zip(self.repo_ids, self._datasets, strict=True):
             extra_keys = set(ds.features).difference(intersection_features)
             logging.warning(
-                f"keys {extra_keys} of {repo_id} were disabled as they are not contained in all the "
-                "other datasets."
+                f"keys {extra_keys} of {repo_id} were disabled as they are not contained in all the " "other datasets."
             )
             self.disabled_features.update(extra_keys)
 

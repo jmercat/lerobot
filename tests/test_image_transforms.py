@@ -21,7 +21,11 @@ from safetensors.torch import load_file
 from torchvision.transforms import v2
 from torchvision.transforms.v2 import functional as F  # noqa: N812
 
-from lerobot.common.datasets.transforms import RandomSubsetApply, SharpnessJitter, get_image_transforms
+from lerobot.common.datasets.transforms import (
+    RandomSubsetApply,
+    SharpnessJitter,
+    get_image_transforms,
+)
 from lerobot.common.utils.utils import init_hydra_config, seeded_context
 from lerobot.scripts.visualize_image_transforms import visualize_transforms
 from tests.utils import DEFAULT_CONFIG_PATH, require_x86_64_kernel
@@ -284,19 +288,17 @@ def test_visualize_image_transforms(repo_id, n_examples):
         assert any(transform_dir.iterdir()), f"No transformed images found in {transform} directory."
 
         # Check for specific files within each transform directory
-        expected_files = [f"{i}.png" for i in range(1, n_examples + 1)] + ["min.png", "max.png", "mean.png"]
+        expected_files = [f"{i}.png" for i in range(1, n_examples + 1)] + [
+            "min.png",
+            "max.png",
+            "mean.png",
+        ]
         for file_name in expected_files:
-            assert (
-                transform_dir / file_name
-            ).exists(), f"{file_name} was not found in {transform} directory."
+            assert (transform_dir / file_name).exists(), f"{file_name} was not found in {transform} directory."
 
     # Check if the combined transforms directory exists and contains the right files
     combined_transforms_dir = output_dir / "all"
     assert combined_transforms_dir.exists(), "Combined transforms directory was not created."
-    assert any(
-        combined_transforms_dir.iterdir()
-    ), "No transformed images found in combined transforms directory."
+    assert any(combined_transforms_dir.iterdir()), "No transformed images found in combined transforms directory."
     for i in range(1, n_examples + 1):
-        assert (
-            combined_transforms_dir / f"{i}.png"
-        ).exists(), f"Combined transform image {i}.png was not found."
+        assert (combined_transforms_dir / f"{i}.png").exists(), f"Combined transform image {i}.png was not found."

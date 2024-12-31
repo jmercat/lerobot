@@ -242,9 +242,7 @@ def get_audio_info(video_path: Path | str) -> dict:
         "audio.channels": audio_stream_info.get("channels", None),
         "audio.codec": audio_stream_info.get("codec_name", None),
         "audio.bit_rate": int(audio_stream_info["bit_rate"]) if audio_stream_info.get("bit_rate") else None,
-        "audio.sample_rate": int(audio_stream_info["sample_rate"])
-        if audio_stream_info.get("sample_rate")
-        else None,
+        "audio.sample_rate": int(audio_stream_info["sample_rate"]) if audio_stream_info.get("sample_rate") else None,
         "audio.bit_depth": audio_stream_info.get("bit_depth", None),
         "audio.channel_layout": audio_stream_info.get("channel_layout", None),
     }

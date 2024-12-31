@@ -62,9 +62,7 @@ def find_cameras(raise_when_empty=False, max_index_search_range=MAX_OPENCV_INDEX
     return cameras
 
 
-def _find_cameras(
-    possible_camera_ids: list[int | str], raise_when_empty=False, mock=False
-) -> list[int | str]:
+def _find_cameras(possible_camera_ids: list[int | str], raise_when_empty=False, mock=False) -> list[int | str]:
     if mock:
         import tests.mock_cv2 as cv2
     else:
@@ -198,9 +196,7 @@ class OpenCVCameraConfig:
 
     def __post_init__(self):
         if self.color_mode not in ["rgb", "bgr"]:
-            raise ValueError(
-                f"`color_mode` is expected to be 'rgb' or 'bgr', but {self.color_mode} is provided."
-            )
+            raise ValueError(f"`color_mode` is expected to be 'rgb' or 'bgr', but {self.color_mode} is provided.")
 
         self.channels = 3
 
@@ -247,7 +243,12 @@ class OpenCVCamera:
     ```
     """
 
-    def __init__(self, camera_index: int | str, config: OpenCVCameraConfig | None = None, **kwargs):
+    def __init__(
+        self,
+        camera_index: int | str,
+        config: OpenCVCameraConfig | None = None,
+        **kwargs,
+    ):
         if config is None:
             config = OpenCVCameraConfig()
 
@@ -351,9 +352,7 @@ class OpenCVCamera:
         # Using `math.isclose` since actual fps can be a float (e.g. 29.9 instead of 30)
         if self.fps is not None and not math.isclose(self.fps, actual_fps, rel_tol=1e-3):
             # Using `OSError` since it's a broad that encompasses issues related to device communication
-            raise OSError(
-                f"Can't set {self.fps=} for OpenCVCamera({self.camera_index}). Actual value is {actual_fps}."
-            )
+            raise OSError(f"Can't set {self.fps=} for OpenCVCamera({self.camera_index}). Actual value is {actual_fps}.")
         if self.width is not None and not math.isclose(self.width, actual_width, rel_tol=1e-3):
             raise OSError(
                 f"Can't set {self.width=} for OpenCVCamera({self.camera_index}). Actual value is {actual_width}."
@@ -391,9 +390,7 @@ class OpenCVCamera:
         requested_color_mode = self.color_mode if temporary_color_mode is None else temporary_color_mode
 
         if requested_color_mode not in ["rgb", "bgr"]:
-            raise ValueError(
-                f"Expected color values are 'rgb' or 'bgr', but {requested_color_mode} is provided."
-            )
+            raise ValueError(f"Expected color values are 'rgb' or 'bgr', but {requested_color_mode} is provided.")
 
         # OpenCV uses BGR format as default (blue, green, red) for all operations, including displaying images.
         # However, Deep Learning framework such as LeRobot uses RGB format as default to train neural networks,

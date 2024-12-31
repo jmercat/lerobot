@@ -214,9 +214,7 @@ def get_features_from_hf_dataset(dataset: Dataset, robot_config: dict | None = N
             assert isinstance(ft.feature, datasets.Value)
             dtype = ft.feature.dtype
             shape = (ft.length,)
-            motor_names = (
-                robot_config["names"][key] if robot_config else [f"motor_{i}" for i in range(ft.length)]
-            )
+            motor_names = robot_config["names"][key] if robot_config else [f"motor_{i}" for i in range(ft.length)]
             assert len(motor_names) == shape[0]
             names = {"motors": motor_names}
         elif isinstance(ft, datasets.Image):
@@ -252,9 +250,7 @@ def add_task_index_by_episodes(dataset: Dataset, tasks_by_episodes: dict) -> tup
     return dataset, tasks
 
 
-def add_task_index_from_tasks_col(
-    dataset: Dataset, tasks_col: str
-) -> tuple[Dataset, dict[str, list[str]], list[str]]:
+def add_task_index_from_tasks_col(dataset: Dataset, tasks_col: str) -> tuple[Dataset, dict[str, list[str]], list[str]]:
     df = dataset.to_pandas()
 
     # HACK: This is to clean some of the instructions in our version of Open X datasets
@@ -293,9 +289,7 @@ def split_parquet_by_episodes(
         for ep_idx in range(ep_chunk_start, ep_chunk_end):
             ep_table = table.filter(pc.equal(table["episode_index"], ep_idx))
             episode_lengths.insert(ep_idx, len(ep_table))
-            output_file = output_dir / DEFAULT_PARQUET_PATH.format(
-                episode_chunk=ep_chunk, episode_index=ep_idx
-            )
+            output_file = output_dir / DEFAULT_PARQUET_PATH.format(episode_chunk=ep_chunk, episode_index=ep_idx)
             pq.write_table(ep_table, output_file)
 
     return episode_lengths
@@ -342,15 +336,11 @@ def move_videos(
         ep_chunk_start = DEFAULT_CHUNK_SIZE * ep_chunk
         ep_chunk_end = min(DEFAULT_CHUNK_SIZE * (ep_chunk + 1), total_episodes)
         for vid_key in video_keys:
-            chunk_dir = "/".join(DEFAULT_VIDEO_PATH.split("/")[:-1]).format(
-                episode_chunk=ep_chunk, video_key=vid_key
-            )
+            chunk_dir = "/".join(DEFAULT_VIDEO_PATH.split("/")[:-1]).format(episode_chunk=ep_chunk, video_key=vid_key)
             (work_dir / chunk_dir).mkdir(parents=True, exist_ok=True)
 
             for ep_idx in range(ep_chunk_start, ep_chunk_end):
-                target_path = DEFAULT_VIDEO_PATH.format(
-                    episode_chunk=ep_chunk, video_key=vid_key, episode_index=ep_idx
-                )
+                target_path = DEFAULT_VIDEO_PATH.format(episode_chunk=ep_chunk, video_key=vid_key, episode_index=ep_idx)
                 video_file = V1_VIDEO_FILE.format(video_key=vid_key, episode_index=ep_idx)
                 if len(video_dirs) == 1:
                     video_path = video_dirs[0] / video_file
@@ -376,7 +366,12 @@ def fix_lfs_video_files_tracking(work_dir: Path, lfs_untracked_videos: list[str]
     for i in range(0, len(lfs_untracked_videos), 100):
         files = lfs_untracked_videos[i : i + 100]
         try:
-            subprocess.run(["git", "rm", "--cached", *files], cwd=work_dir, capture_output=True, check=True)
+            subprocess.run(
+                ["git", "rm", "--cached", *files],
+                cwd=work_dir,
+                capture_output=True,
+                check=True,
+            )
         except subprocess.CalledProcessError as e:
             print("git rm --cached ERROR:")
             print(e.stderr)
@@ -399,7 +394,17 @@ def _lfs_clone(repo_id: str, work_dir: Path, branch: str) -> None:
     repo_url = f"https://huggingface.co/datasets/{repo_id}"
     env = {"GIT_LFS_SKIP_SMUDGE": "1"}  # Prevent downloading LFS files
     subprocess.run(
-        ["git", "clone", "--branch", branch, "--single-branch", "--depth", "1", repo_url, str(work_dir)],
+        [
+            "git",
+            "clone",
+            "--branch",
+            branch,
+            "--single-branch",
+            "--depth",
+            "1",
+            repo_url,
+            str(work_dir),
+        ],
         check=True,
         env=env,
     )
@@ -407,7 +412,11 @@ def _lfs_clone(repo_id: str, work_dir: Path, branch: str) -> None:
 
 def _get_lfs_untracked_videos(work_dir: Path, video_files: list[str]) -> list[str]:
     lfs_tracked_files = subprocess.run(
-        ["git", "lfs", "ls-files", "-n"], cwd=work_dir, capture_output=True, text=True, check=True
+        ["git", "lfs", "ls-files", "-n"],
+        cwd=work_dir,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     lfs_tracked_files = set(lfs_tracked_files.stdout.splitlines())
     return [f for f in video_files if f not in lfs_tracked_files]
@@ -416,12 +425,15 @@ def _get_lfs_untracked_videos(work_dir: Path, video_files: list[str]) -> list[st
 def get_videos_info(repo_id: str, local_dir: Path, video_keys: list[str], branch: str) -> dict:
     # Assumes first episode
     video_files = [
-        DEFAULT_VIDEO_PATH.format(episode_chunk=0, video_key=vid_key, episode_index=0)
-        for vid_key in video_keys
+        DEFAULT_VIDEO_PATH.format(episode_chunk=0, video_key=vid_key, episode_index=0) for vid_key in video_keys
     ]
     hub_api = HfApi()
     hub_api.snapshot_download(
-        repo_id=repo_id, repo_type="dataset", local_dir=local_dir, revision=branch, allow_patterns=video_files
+        repo_id=repo_id,
+        repo_type="dataset",
+        local_dir=local_dir,
+        revision=branch,
+        allow_patterns=video_files,
     )
     videos_info_dict = {}
     for vid_key, vid_path in zip(video_keys, video_files, strict=True):
@@ -448,7 +460,11 @@ def convert_dataset(
 
     hub_api = HfApi()
     hub_api.snapshot_download(
-        repo_id=repo_id, repo_type="dataset", revision=v1, local_dir=v1x_dir, ignore_patterns="videos*/"
+        repo_id=repo_id,
+        repo_type="dataset",
+        revision=v1,
+        local_dir=v1x_dir,
+        ignore_patterns="videos*/",
     )
     branch = "main"
     if test_branch:
@@ -506,12 +522,21 @@ def convert_dataset(
         dataset = dataset.remove_columns(video_keys)
         clean_gitattr = Path(
             hub_api.hf_hub_download(
-                repo_id=GITATTRIBUTES_REF, repo_type="dataset", local_dir=local_dir, filename=".gitattributes"
+                repo_id=GITATTRIBUTES_REF,
+                repo_type="dataset",
+                local_dir=local_dir,
+                filename=".gitattributes",
             )
         ).absolute()
         with tempfile.TemporaryDirectory() as tmp_video_dir:
             move_videos(
-                repo_id, video_keys, total_episodes, total_chunks, Path(tmp_video_dir), clean_gitattr, branch
+                repo_id,
+                video_keys,
+                total_episodes,
+                total_chunks,
+                Path(tmp_video_dir),
+                clean_gitattr,
+                branch,
             )
         videos_info = get_videos_info(repo_id, v1x_dir, video_keys=video_keys, branch=branch)
         for key in video_keys:
@@ -540,7 +565,11 @@ def convert_dataset(
 
     # Episodes
     episodes = [
-        {"episode_index": ep_idx, "tasks": tasks_by_episodes[ep_idx], "length": episode_lengths[ep_idx]}
+        {
+            "episode_index": ep_idx,
+            "tasks": tasks_by_episodes[ep_idx],
+            "length": episode_lengths[ep_idx],
+        }
         for ep_idx in episode_indices
     ]
     write_jsonlines(episodes, v20_dir / EPISODES_PATH)
@@ -569,7 +598,12 @@ def convert_dataset(
         hub_api.delete_folder(repo_id=repo_id, path_in_repo="data", repo_type="dataset", revision=branch)
 
     with contextlib.suppress(EntryNotFoundError, HfHubHTTPError):
-        hub_api.delete_folder(repo_id=repo_id, path_in_repo="meta_data", repo_type="dataset", revision=branch)
+        hub_api.delete_folder(
+            repo_id=repo_id,
+            path_in_repo="meta_data",
+            repo_type="dataset",
+            revision=branch,
+        )
 
     with contextlib.suppress(EntryNotFoundError, HfHubHTTPError):
         hub_api.delete_folder(repo_id=repo_id, path_in_repo="meta", repo_type="dataset", revision=branch)

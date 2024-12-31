@@ -233,15 +233,11 @@ def load_from_raw(
                 shutil.rmtree(tmp_imgs_dir)
 
                 # store the reference to the video frame
-                ep_dict[img_key] = [
-                    {"path": f"videos/{fname}", "timestamp": i / fps} for i in range(num_frames)
-                ]
+                ep_dict[img_key] = [{"path": f"videos/{fname}", "timestamp": i / fps} for i in range(num_frames)]
             else:
                 ep_dict[img_key] = [PILImage.fromarray(x) for x in imgs_array]
 
-        path_ep_dict = tmp_ep_dicts_dir.joinpath(
-            "ep_dict_" + "0" * (10 - len(str(ep_idx))) + str(ep_idx) + ".pt"
-        )
+        path_ep_dict = tmp_ep_dicts_dir.joinpath("ep_dict_" + "0" * (10 - len(str(ep_idx))) + str(ep_idx) + ".pt")
         torch.save(ep_dict, path_ep_dict)
 
         ep_dicts.append(ep_dict)
@@ -270,9 +266,7 @@ def to_hf_dataset(data_dict, video) -> Dataset:
     if "language_instruction" in data_dict:
         features["language_instruction"] = Value(dtype="string", id=None)
 
-    features["action"] = Sequence(
-        length=data_dict["action"].shape[1], feature=Value(dtype="float32", id=None)
-    )
+    features["action"] = Sequence(length=data_dict["action"].shape[1], feature=Value(dtype="float32", id=None))
 
     features["is_terminal"] = Value(dtype="bool", id=None)
     features["is_first"] = Value(dtype="bool", id=None)

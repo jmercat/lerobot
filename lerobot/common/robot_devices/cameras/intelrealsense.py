@@ -176,9 +176,7 @@ class IntelRealSenseCameraConfig:
 
     def __post_init__(self):
         if self.color_mode not in ["rgb", "bgr"]:
-            raise ValueError(
-                f"`color_mode` is expected to be 'rgb' or 'bgr', but {self.color_mode} is provided."
-            )
+            raise ValueError(f"`color_mode` is expected to be 'rgb' or 'bgr', but {self.color_mode} is provided.")
 
         self.channels = 3
 
@@ -309,9 +307,7 @@ class IntelRealSenseCamera:
 
     def connect(self):
         if self.is_connected:
-            raise RobotDeviceAlreadyConnectedError(
-                f"IntelRealSenseCamera({self.serial_number}) is already connected."
-            )
+            raise RobotDeviceAlreadyConnectedError(f"IntelRealSenseCamera({self.serial_number}) is already connected.")
 
         if self.mock:
             import tests.mock_pyrealsense2 as rs
@@ -415,9 +411,7 @@ class IntelRealSenseCamera:
 
         requested_color_mode = self.color_mode if temporary_color is None else temporary_color
         if requested_color_mode not in ["rgb", "bgr"]:
-            raise ValueError(
-                f"Expected color values are 'rgb' or 'bgr', but {requested_color_mode} is provided."
-            )
+            raise ValueError(f"Expected color values are 'rgb' or 'bgr', but {requested_color_mode} is provided.")
 
         # IntelRealSense uses RGB format as default (red, green, blue).
         if requested_color_mode == "bgr":

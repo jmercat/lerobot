@@ -270,9 +270,7 @@ class GPT(nn.Module):
         param_dict = dict(self.named_parameters())
         inter_params = decay & no_decay
         union_params = decay | no_decay
-        assert len(inter_params) == 0, "parameters {} made it into both decay/no_decay sets!".format(
-            str(inter_params)
-        )
+        assert len(inter_params) == 0, "parameters {} made it into both decay/no_decay sets!".format(str(inter_params))
         assert (
             len(param_dict.keys() - union_params) == 0
         ), "parameters {} were not separated into either decay/no_decay set!".format(
@@ -377,7 +375,10 @@ class ResidualVQ(nn.Module):
         self.layers = nn.ModuleList(
             [
                 VectorQuantize(
-                    dim=codebook_dim, codebook_dim=codebook_dim, accept_image_fmap=accept_image_fmap, **kwargs
+                    dim=codebook_dim,
+                    codebook_dim=codebook_dim,
+                    accept_image_fmap=accept_image_fmap,
+                    **kwargs,
                 )
                 for _ in range(num_quantizers)
             ]
@@ -389,7 +390,9 @@ class ResidualVQ(nn.Module):
 
         self.register_buffer("freeze_codebook", torch.tensor(False))
         self.quantize_dropout_cutoff_index = quantize_dropout_cutoff_index
-        self.quantize_dropout_multiple_of = quantize_dropout_multiple_of  # encodec paper proposes structured dropout, believe this was set to 4
+        self.quantize_dropout_multiple_of = (
+            quantize_dropout_multiple_of  # encodec paper proposes structured dropout, believe this was set to 4
+        )
 
         if not shared_codebook:
             return
@@ -432,9 +435,7 @@ class ResidualVQ(nn.Module):
         # take care of quantizer dropout
 
         mask = gather_indices == -1.0
-        gather_indices = gather_indices.masked_fill(
-            mask, 0
-        )  # have it fetch a dummy code to be masked out later
+        gather_indices = gather_indices.masked_fill(mask, 0)  # have it fetch a dummy code to be masked out later
 
         all_codes = codebooks.gather(2, gather_indices)  # gather all codes
 
@@ -487,9 +488,7 @@ class ResidualVQ(nn.Module):
 
             if quant_dropout_multiple_of != 1:
                 rand_quantize_dropout_index = (
-                    ceil((rand_quantize_dropout_index + 1) / quant_dropout_multiple_of)
-                    * quant_dropout_multiple_of
-                    - 1
+                    ceil((rand_quantize_dropout_index + 1) / quant_dropout_multiple_of) * quant_dropout_multiple_of - 1
                 )
 
             null_indices_shape = (x.shape[0], *x.shape[-2:]) if self.accept_image_fmap else tuple(x.shape[:2])
@@ -604,7 +603,9 @@ class VectorQuantize(nn.Module):
 
         self.eps = eps
         self.commitment_weight = commitment_weight
-        self.commitment_use_cross_entropy_loss = commitment_use_cross_entropy_loss  # whether to use cross entropy loss to codebook as commitment loss
+        self.commitment_use_cross_entropy_loss = (
+            commitment_use_cross_entropy_loss  # whether to use cross entropy loss to codebook as commitment loss
+        )
 
         self.learnable_codebook = learnable_codebook
 
@@ -821,9 +822,7 @@ class VectorQuantize(nn.Module):
             else:
                 dist_einops_eq = "1 (b h) n l -> b l n h"
 
-            ce_loss = F.cross_entropy(
-                rearrange(distances, dist_einops_eq, b=shape[0]), codes, ignore_index=-1
-            )
+            ce_loss = F.cross_entropy(rearrange(distances, dist_einops_eq, b=shape[0]), codes, ignore_index=-1)
 
             return ce_loss
 
@@ -1201,9 +1200,7 @@ class EuclideanCodebook(nn.Module):
         self.kmeans_iters = kmeans_iters
         self.eps = eps
         self.threshold_ema_dead_code = threshold_ema_dead_code
-        self.reset_cluster_size = (
-            reset_cluster_size if (reset_cluster_size is not None) else threshold_ema_dead_code
-        )
+        self.reset_cluster_size = reset_cluster_size if (reset_cluster_size is not None) else threshold_ema_dead_code
 
         assert callable(gumbel_sample)
         self.gumbel_sample = gumbel_sample
@@ -1356,9 +1353,7 @@ class EuclideanCodebook(nn.Module):
         self.update_with_decay("batch_variance", batch_variance, self.affine_param_batch_decay)
 
     def replace(self, batch_samples, batch_mask):
-        for ind, (samples, mask) in enumerate(
-            zip(batch_samples.unbind(dim=0), batch_mask.unbind(dim=0), strict=False)
-        ):
+        for ind, (samples, mask) in enumerate(zip(batch_samples.unbind(dim=0), batch_mask.unbind(dim=0), strict=False)):
             if not torch.any(mask):
                 continue
 
@@ -1385,9 +1380,7 @@ class EuclideanCodebook(nn.Module):
     @autocast(enabled=False)
     def forward(self, x, sample_codebook_temp=None, mask=None, freeze_codebook=False):
         needs_codebook_dim = x.ndim < 4
-        sample_codebook_temp = (
-            sample_codebook_temp if (sample_codebook_temp is not None) else self.sample_codebook_temp
-        )
+        sample_codebook_temp = sample_codebook_temp if (sample_codebook_temp is not None) else self.sample_codebook_temp
 
         x = x.float()
 
@@ -1446,9 +1439,9 @@ class EuclideanCodebook(nn.Module):
             self.all_reduce_fn(embed_sum.contiguous())
             ema_inplace(self.embed_avg.data, embed_sum, self.decay)
 
-            cluster_size = laplace_smoothing(
-                self.cluster_size, self.codebook_size, self.eps
-            ) * self.cluster_size.sum(dim=-1, keepdim=True)
+            cluster_size = laplace_smoothing(self.cluster_size, self.codebook_size, self.eps) * self.cluster_size.sum(
+                dim=-1, keepdim=True
+            )
 
             embed_normalized = self.embed_avg / rearrange(cluster_size, "... -> ... 1")
             self.embed.data.copy_(embed_normalized)

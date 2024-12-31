@@ -89,8 +89,7 @@ def create_stats_buffers(
 
 def _no_stats_error_str(name: str) -> str:
     return (
-        f"`{name}` is infinity. You should either initialize with `stats` as an argument, or use a "
-        "pretrained model."
+        f"`{name}` is infinity. You should either initialize with `stats` as an argument, or use a " "pretrained model."
     )
 
 
@@ -207,6 +206,8 @@ class Unnormalize(nn.Module):
                 std = buffer["std"]
                 assert not torch.isinf(mean).any(), _no_stats_error_str("mean")
                 assert not torch.isinf(std).any(), _no_stats_error_str("std")
+                std = std.to(batch[key].device)
+                mean = mean.to(batch[key].device)
                 batch[key] = batch[key] * std + mean
             elif mode == "min_max":
                 min = buffer["min"]

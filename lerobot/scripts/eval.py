@@ -179,9 +179,7 @@ def rollout(
         all_successes.append(torch.tensor(successes))
 
         step += 1
-        running_success_rate = (
-            einops.reduce(torch.stack(all_successes, dim=1), "b n -> b", "any").numpy().mean()
-        )
+        running_success_rate = einops.reduce(torch.stack(all_successes, dim=1), "b n -> b", "any").numpy().mean()
         progbar.set_postfix({"running_success_rate": f"{running_success_rate.item() * 100:.1f}%"})
         progbar.update()
 
@@ -278,7 +276,8 @@ def eval_policy(
             seeds = None
         else:
             seeds = range(
-                start_seed + (batch_ix * env.num_envs), start_seed + ((batch_ix + 1) * env.num_envs)
+                start_seed + (batch_ix * env.num_envs),
+                start_seed + ((batch_ix + 1) * env.num_envs),
             )
         rollout_data = rollout(
             env,
@@ -330,9 +329,7 @@ def eval_policy(
         # Maybe render video for visualization.
         if max_episodes_rendered > 0 and len(ep_frames) > 0:
             batch_stacked_frames = np.stack(ep_frames, axis=1)  # (b, t, *)
-            for stacked_frames, done_index in zip(
-                batch_stacked_frames, done_indices.flatten().tolist(), strict=False
-            ):
+            for stacked_frames, done_index in zip(batch_stacked_frames, done_indices.flatten().tolist(), strict=False):
                 if n_episodes_rendered >= max_episodes_rendered:
                     break
 
@@ -351,9 +348,7 @@ def eval_policy(
                 threads.append(thread)
                 n_episodes_rendered += 1
 
-        progbar.set_postfix(
-            {"running_success_rate": f"{np.mean(all_successes[:n_episodes]).item() * 100:.1f}%"}
-        )
+        progbar.set_postfix({"running_success_rate": f"{np.mean(all_successes[:n_episodes]).item() * 100:.1f}%"})
 
     # Wait till all video rendering threads are done.
     for thread in threads:
@@ -398,7 +393,11 @@ def eval_policy(
 
 
 def _compile_episode_data(
-    rollout_data: dict, done_indices: Tensor, start_episode_index: int, start_data_index: int, fps: float
+    rollout_data: dict,
+    done_indices: Tensor,
+    start_episode_index: int,
+    start_data_index: int,
+    fps: float,
 ) -> dict:
     """Convenience function for `eval_policy(return_episode_data=True)`
 
@@ -481,7 +480,10 @@ def main(
 
     logging.info("Making policy.")
     if hydra_cfg_path is None:
-        policy = make_policy(hydra_cfg=hydra_cfg, pretrained_policy_name_or_path=str(pretrained_policy_path))
+        policy = make_policy(
+            hydra_cfg=hydra_cfg,
+            pretrained_policy_name_or_path=str(pretrained_policy_path),
+        )
     else:
         # Note: We need the dataset stats to pass to the policy's normalization modules.
         policy = make_policy(hydra_cfg=hydra_cfg, dataset_stats=make_dataset(hydra_cfg).meta.stats)
@@ -514,13 +516,9 @@ def get_pretrained_policy_path(pretrained_policy_name_or_path, revision=None):
         pretrained_policy_path = Path(snapshot_download(pretrained_policy_name_or_path, revision=revision))
     except (HFValidationError, RepositoryNotFoundError) as e:
         if isinstance(e, HFValidationError):
-            error_message = (
-                "The provided pretrained_policy_name_or_path is not a valid Hugging Face Hub repo ID."
-            )
+            error_message = "The provided pretrained_policy_name_or_path is not a valid Hugging Face Hub repo ID."
         else:
-            error_message = (
-                "The provided pretrained_policy_name_or_path was not found on the Hugging Face Hub."
-            )
+            error_message = "The provided pretrained_policy_name_or_path was not found on the Hugging Face Hub."
 
         logging.warning(f"{error_message} Treating it as a local directory.")
         pretrained_policy_path = Path(pretrained_policy_name_or_path)
@@ -535,9 +533,7 @@ def get_pretrained_policy_path(pretrained_policy_name_or_path, revision=None):
 if __name__ == "__main__":
     init_logging()
 
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         "-p",
@@ -571,11 +567,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.pretrained_policy_name_or_path is None:
-        main(hydra_cfg_path=args.config, out_dir=args.out_dir, config_overrides=args.overrides)
-    else:
-        pretrained_policy_path = get_pretrained_policy_path(
-            args.pretrained_policy_name_or_path, revision=args.revision
+        main(
+            hydra_cfg_path=args.config,
+            out_dir=args.out_dir,
+            config_overrides=args.overrides,
         )
+    else:
+        pretrained_policy_path = get_pretrained_policy_path(args.pretrained_policy_name_or_path, revision=args.revision)
 
         main(
             pretrained_policy_path=pretrained_policy_path,

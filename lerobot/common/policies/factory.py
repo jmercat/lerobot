@@ -25,9 +25,7 @@ from lerobot.common.utils.utils import get_safe_torch_device
 def _policy_cfg_from_hydra_cfg(policy_cfg_class, hydra_cfg):
     expected_kwargs = set(inspect.signature(policy_cfg_class).parameters)
     if not set(hydra_cfg.policy).issuperset(expected_kwargs):
-        logging.warning(
-            f"Hydra config is missing arguments: {set(expected_kwargs).difference(hydra_cfg.policy)}"
-        )
+        logging.warning(f"Hydra config is missing arguments: {set(expected_kwargs).difference(hydra_cfg.policy)}")
 
     # OmegaConf.to_container returns lists where sequences are found, but our dataclasses use tuples to avoid
     # issues with mutable defaults. This filter changes all lists to tuples.
@@ -52,7 +50,9 @@ def get_policy_and_config_classes(name: str) -> tuple[Policy, object]:
 
         return TDMPCPolicy, TDMPCConfig
     elif name == "diffusion":
-        from lerobot.common.policies.diffusion.configuration_diffusion import DiffusionConfig
+        from lerobot.common.policies.diffusion.configuration_diffusion import (
+            DiffusionConfig,
+        )
         from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
 
         return DiffusionPolicy, DiffusionConfig
@@ -61,17 +61,29 @@ def get_policy_and_config_classes(name: str) -> tuple[Policy, object]:
         from lerobot.common.policies.act.modeling_act import ACTPolicy
 
         return ACTPolicy, ACTConfig
+    elif name == "mbm":
+        from lerobot.common.policies.mbm.configuration_mbm import MBMConfig
+        from lerobot.common.policies.mbm.modeling_mbm import MBMPolicy
+
+        return MBMPolicy, MBMConfig
     elif name == "vqbet":
         from lerobot.common.policies.vqbet.configuration_vqbet import VQBeTConfig
         from lerobot.common.policies.vqbet.modeling_vqbet import VQBeTPolicy
 
         return VQBeTPolicy, VQBeTConfig
+    elif name == "gemini":
+        from lerobot.common.policies.gemini.modeling_gemini import GeminiPolicy
+        from lerobot.common.policies.gemini.configuration_gemini import GeminiConfig
+
+        return GeminiPolicy, GeminiConfig
     else:
         raise NotImplementedError(f"Policy with name {name} is not implemented.")
 
 
 def make_policy(
-    hydra_cfg: DictConfig, pretrained_policy_name_or_path: str | None = None, dataset_stats=None
+    hydra_cfg: DictConfig,
+    pretrained_policy_name_or_path: str | None = None,
+    dataset_stats=None,
 ) -> Policy:
     """Make an instance of a policy class.
 
@@ -86,9 +98,7 @@ def make_policy(
             policy. Therefore, this argument is mutually exclusive with `pretrained_policy_name_or_path`.
     """
     if not (pretrained_policy_name_or_path is None) ^ (dataset_stats is None):
-        raise ValueError(
-            "Exactly one of `pretrained_policy_name_or_path` and `dataset_stats` must be provided."
-        )
+        raise ValueError("Exactly one of `pretrained_policy_name_or_path` and `dataset_stats` must be provided.")
 
     policy_cls, policy_cfg_class = get_policy_and_config_classes(hydra_cfg.policy.name)
 

@@ -26,7 +26,9 @@ import torch
 from lerobot import available_cameras, available_motors, available_robots
 from lerobot.common.robot_devices.cameras.utils import Camera
 from lerobot.common.robot_devices.motors.utils import MotorsBus
-from lerobot.common.robot_devices.robots.factory import make_robot as make_robot_from_cfg
+from lerobot.common.robot_devices.robots.factory import (
+    make_robot as make_robot_from_cfg,
+)
 from lerobot.common.robot_devices.robots.utils import Robot
 from lerobot.common.utils.import_utils import is_package_available
 from lerobot.common.utils.utils import init_hydra_config
@@ -292,7 +294,14 @@ def mock_calibration_dir(calibration_dir):
         "start_pos": [1442, 843, 2166, 2849, 1988, 1835],
         "end_pos": [2440, 1869, -1106, -1848, -926, 3235],
         "calib_mode": ["DEGREE", "DEGREE", "DEGREE", "DEGREE", "DEGREE", "LINEAR"],
-        "motor_names": ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"],
+        "motor_names": [
+            "shoulder_pan",
+            "shoulder_lift",
+            "elbow_flex",
+            "wrist_flex",
+            "wrist_roll",
+            "gripper",
+        ],
     }
     Path(str(calibration_dir)).mkdir(parents=True, exist_ok=True)
     with open(calibration_dir / "main_follower.json", "w") as f:
@@ -359,7 +368,9 @@ def make_camera(camera_type, **kwargs) -> Camera:
         return OpenCVCamera(camera_index, **kwargs)
 
     elif camera_type == "intelrealsense":
-        from lerobot.common.robot_devices.cameras.intelrealsense import IntelRealSenseCamera
+        from lerobot.common.robot_devices.cameras.intelrealsense import (
+            IntelRealSenseCamera,
+        )
 
         camera_index = kwargs.pop("camera_index", INTELREALSENSE_CAMERA_INDEX)
         return IntelRealSenseCamera(camera_index, **kwargs)
