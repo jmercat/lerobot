@@ -568,7 +568,6 @@ if __name__ == "__main__":
     del kwargs["robot_overrides"]
 
     robot_cfg = init_hydra_config(robot_path, robot_overrides)
-    breakpoint()
     robot = make_robot(robot_cfg)
 
     if control_mode == "calibrate":

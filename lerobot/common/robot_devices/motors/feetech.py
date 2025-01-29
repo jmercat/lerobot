@@ -308,7 +308,6 @@ class FeetechMotorsBus:
                 f"FeetechMotorsBus({self.port}) is already connected. Do not call `motors_bus.connect()` twice."
             )
 
-        breakpoint()
         if self.mock:
             import tests.mock_scservo_sdk as scs
         else:
