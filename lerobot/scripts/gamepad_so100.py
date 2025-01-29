@@ -57,6 +57,9 @@ def gamepad_control_robot(simulated_robot):
     last_successful_angles = previous_ik.copy()
     last_command_time = time.time()
     movement_active = False
+    fine_control_active = False
+    plus_pressed_last_frame = False
+    minus_pressed_last_frame = False
     
     # Gripper control parameters
     GRIPPER_OPEN_ANGLE = np.radians(80)
@@ -82,7 +85,6 @@ def gamepad_control_robot(simulated_robot):
         'Right': {'pos': None, 'orientation': None, 'angles': None}
     }
     store_mode = False
-    plus_pressed_last_frame = False
     
     print("\nControls:")
     print("Left Stick: Move in X-Y plane")
@@ -90,7 +92,7 @@ def gamepad_control_robot(simulated_robot):
     print("Right Stick X-axis: Rotate gripper")
     print("L Button: Open gripper progressively")
     print("R Button: Close gripper progressively")
-    print("ZL/ZR Triggers: Fine control mode")
+    print("Minus Button: Toggle fine control")
     print("Home Button: Return to home position")
     print("Capture Button: Exit")
     print("Plus: Toggle store mode")
@@ -181,6 +183,18 @@ def gamepad_control_robot(simulated_robot):
                             # Reset command timer to keep movement active
                             last_command_time = current_time
                 
+                # Handle button toggles
+                if 'Minus' in state['buttons'] and not minus_pressed_last_frame:
+                    fine_control_active = not fine_control_active
+                    print(f"Fine control: {'ON' if fine_control_active else 'OFF'}")
+                minus_pressed_last_frame = 'Minus' in state['buttons']
+
+                # Calculate fine control mode based on toggle
+                fine_control = 0.2 if fine_control_active else 1.0
+                current_pos_step = pos_step_size * fine_control
+                current_rot_step = rot_step_size * fine_control
+                current_gripper_step = gripper_step * fine_control
+                
                 # Get stick values with deadzone
                 left_stick = state['sticks']['left']
                 right_stick = state['sticks']['right']
@@ -193,12 +207,6 @@ def gamepad_control_robot(simulated_robot):
                 
                 # Check if any movement is active
                 movement_active = any([abs(v) > 0 for v in [lx, ly, rx, ry]])
-                
-                # Calculate fine control mode based on triggers
-                fine_control = 1.0 if ('ZL' not in state['buttons'] and 'ZR' not in state['buttons']) else 0.2
-                current_pos_step = pos_step_size * fine_control
-                current_rot_step = rot_step_size * fine_control
-                current_gripper_step = gripper_step * fine_control  # Apply fine control to gripper speed
                 
                 # Progressive gripper control with R/L buttons
                 gripper_changed = False
