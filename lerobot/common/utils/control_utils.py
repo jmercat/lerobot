@@ -108,7 +108,7 @@ class SimulatedRobot:
         
         return position, rotation
 
-    def inverse_kinematics(self, target_pos, target_orientation=None, current_angles=None, max_iter=100, orientation_weight=0.5):
+    def inverse_kinematics(self, target_pos, target_orientation=None, current_angles=None, max_iter=100, orientation_weight=0.01, tolerance=1e-2):
         """Calculate joint angles using MuJoCo's Jacobian"""
         # Only use first 5 joints (excluding gripper and gripper rotation)
         actuated_joint_ids = self.actuated_joint_ids  # Changed from [:-1] to [:5]
@@ -120,7 +120,6 @@ class SimulatedRobot:
         
         # Adjust parameters for better convergence
         alpha = 0.1  # Reduced step size further for more stability
-        tolerance = 1e-2  # Slightly increased tolerance
         min_improvement = 1e-6  # Minimum improvement threshold
         last_error = float('inf')
         stall_count = 0
@@ -174,7 +173,7 @@ class SimulatedRobot:
                 stall_count = 0
             
             if error_norm < tolerance:
-                print(f"IK converged after {iteration} iterations, error: {error_norm}")
+                # print(f"IK converged after {iteration} iterations, error: {error_norm}")
                 break
             
             if stall_count >= max_stall:
@@ -400,8 +399,14 @@ class RealRobot:
             time.sleep(1.0 / self.update_frequency)
 
     def read(self, to_sim=False):
+        angles = None
         with self._lock:
-            angles = self.arm.read("Present_Position")
+            while angles is None:
+                try:
+                    angles = self.arm.read("Present_Position")
+                except ConnectionError as e:
+                    print(f"Robot communication error: {e}")
+                    time.sleep(0.01)
         if to_sim:
             angles = np.radians(angles - self.home_pos - self.sim_zero)
             angles[0] = -angles[0]

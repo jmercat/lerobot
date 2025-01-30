@@ -71,8 +71,13 @@ class ProController:
         """Read and return the full controller state"""
         if not self.dev:
             return {}
-        
-        data = self.dev.read(64, 1)
+        data = None 
+        while data is None:
+            try:
+                data = self.dev.read(64, 1)
+            except ConnectionError as e:
+                print(f"Gamepad communication error: {e}")
+                time.sleep(0.01)
         if not data:
             return self._last_state if hasattr(self, '_last_state') else {}
         

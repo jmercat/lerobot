@@ -257,26 +257,11 @@ def get_episode_data(dataset: LeRobotDataset | IterableNamespace, episode_index)
     if isinstance(dataset, LeRobotDataset):
         from_idx = dataset.episode_data_index["from"][episode_index]
         to_idx = dataset.episode_data_index["to"][episode_index]
-<<<<<<< HEAD
-        selected_columns = ["timestamp"]
-        if has_state:
-            selected_columns += ["observation.state"]
-        if has_action:
-            selected_columns += ["action"]
-        data = dataset.hf_dataset.select(range(from_idx, to_idx)).select_columns(selected_columns).with_format("numpy")
-        rows = np.hstack(
-            (
-                np.expand_dims(data["timestamp"], axis=1),
-                *[data[col] for col in selected_columns[1:]],
-            )
-        ).tolist()
-=======
         data = (
             dataset.hf_dataset.select(range(from_idx, to_idx))
             .select_columns(selected_columns)
             .with_format("pandas")
         )
->>>>>>> origin/main
     else:
         repo_id = dataset.repo_id
 
