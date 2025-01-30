@@ -115,6 +115,24 @@ wandb login
 
 (note: you will also need to enable WandB in the configuration. See below.)
 
+## SO100 Robot Control with Nintendo Switch Pro Controller
+
+To control the SO100 robot or its simulation using a Nintendo Switch Pro Controller:
+
+1. Install the required dependencies:
+```bash
+pip install mujoco hid
+```
+
+2. Connect your Nintendo Switch Pro Controller via Bluetooth
+
+3. Run the gamepad control script:
+```bash
+mjpython lerobot/scripts/gamepad_so100.py
+```
+
+The script will automatically detect whether to control the physical robot or its simulation.
+
 ## Walkthrough
 
 ```
