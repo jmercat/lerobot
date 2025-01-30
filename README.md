@@ -124,14 +124,14 @@ To control the SO100 robot or its simulation using a Nintendo Switch Pro Control
 pip install mujoco hid
 ```
 
-2. Connect your Nintendo Switch Pro Controller via Bluetooth
+2. Connect your Nintendo Switch Pro Controller via Bluetooth (you might need to pair it by plugging in the usb cord the first time)
 
 3. Run the gamepad control script:
 ```bash
 mjpython lerobot/scripts/gamepad_so100.py
 ```
 
-The script will automatically detect whether to control the physical robot or its simulation.
+The script will automatically set up and calibrate the controller and then start controlling the physical robot and its simulation.
 
 ## Walkthrough
 
