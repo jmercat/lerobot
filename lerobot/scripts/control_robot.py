@@ -310,15 +310,20 @@ def record(
                 # Ensure episode is saved after recording
                 dataset.save_episode()
                 # Wait for video encoding to complete before continuing
-                dataset.wait_for_video_encoding(timeout=30, verbose=True)
+                # Increased timeout to 120 seconds for larger videos
+                encoding_success = dataset.wait_for_video_encoding(timeout=120, verbose=True)
+                if not encoding_success:
+                    logging.warning("Video encoding timed out. Videos may be incomplete.")
             except KeyboardInterrupt:
                 # Handle interrupt during recording by saving partial episode
                 log_say("Recording interrupted, saving partial episode", cfg.play_sounds)
                 # Try to save what we have, but don't block if it's taking too long
                 try:
                     dataset.save_episode()
-                    # Wait for video encoding to complete before continuing
-                    dataset.wait_for_video_encoding(timeout=30, verbose=True)
+                    # Wait with increased timeout and check success
+                    encoding_success = dataset.wait_for_video_encoding(timeout=120, verbose=True)
+                    if not encoding_success:
+                        logging.warning("Video encoding timed out after interruption. Videos may be incomplete.")
                 except Exception as e:
                     logging.error(f"Error saving episode: {e}")
                 events["stop_recording"] = True
@@ -358,9 +363,24 @@ def record(
         logging.error(f"Error during recording: {e}")
         raise
     finally:
+        # Ensure videos are fully encoded before shutting down
+        log_say("Finalizing dataset, please wait...", cfg.play_sounds)
+        try:
+            # Final wait for any pending encoding with extended timeout
+            if hasattr(dataset, 'wait_for_video_encoding'):
+                encoding_success = dataset.wait_for_video_encoding(timeout=300, verbose=True)
+                if not encoding_success:
+                    logging.error("Final video encoding timed out. Some videos may be incomplete.")
+        except Exception as e:
+            logging.error(f"Error during final video encoding: {e}")
+        
         # Always ensure image writer is shutdown properly, with non-graceful stop
         # to prevent blocking on exit
         if hasattr(dataset, 'image_writer') and dataset.image_writer is not None:
+            dataset.image_writer.stop(graceful=True)
+            # Additional time for graceful shutdown
+            time.sleep(2)
+            # Force stop if still running
             dataset.image_writer.stop(graceful=False)
         
         # Stop the keyboard listener
@@ -371,11 +391,10 @@ def record(
         if cfg.display_cameras and not is_headless():
             cv2.destroyAllWindows()
 
-    if listener is not None:
-        listener.stop()
-
-    if cfg.display_cameras and not is_headless():
-        cv2.destroyAllWindows()
+    # Remove redundant code that was moved to the finally block
+    if cfg.push_to_hub:
+        log_say("Pushing dataset to hub", cfg.play_sounds)
+        dataset.push_to_hub()
 
     robot.disconnect()
     return dataset

@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """ Visualize data of **all** frames of any episode of a dataset of type LeRobotDataset.
 
 Note: The last frame of the episode doesnt always correspond to a final state.
