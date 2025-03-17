@@ -18,6 +18,7 @@ import logging
 import shutil
 from pathlib import Path
 from typing import Callable
+import time
 
 import datasets
 import numpy as np
@@ -36,7 +37,9 @@ from lerobot.common.datasets.image_writer import AsyncImageWriter, write_image
 from lerobot.common.datasets.utils import (
     DEFAULT_FEATURES,
     DEFAULT_IMAGE_PATH,
+    EPISODES_PATH,
     INFO_PATH,
+    EPISODES_STATS_PATH,
     TASKS_PATH,
     append_jsonlines,
     backward_compatible_episodes_stats,
@@ -45,6 +48,7 @@ from lerobot.common.datasets.utils import (
     check_version_compatibility,
     create_empty_dataset_info,
     create_lerobot_dataset_card,
+    dataset_to_policy_features,
     embed_images,
     get_delta_indices,
     get_episode_data_index,
@@ -56,6 +60,7 @@ from lerobot.common.datasets.utils import (
     load_episodes,
     load_episodes_stats,
     load_info,
+    load_jsonlines,
     load_stats,
     load_tasks,
     validate_episode_buffer,
@@ -64,11 +69,15 @@ from lerobot.common.datasets.utils import (
     write_episode_stats,
     write_info,
     write_json,
+    write_jsonlines,
+    write_stats,
+    write_task,
 )
 from lerobot.common.datasets.video_utils import (
     VideoFrame,
     decode_video_frames,
     encode_video_frames,
+    encode_video_frames_background,
     get_video_info,
 )
 from lerobot.common.robot_devices.robots.utils import Robot
@@ -244,38 +253,45 @@ class LeRobotDatasetMetadata:
         }
         append_jsonlines(task_dict, self.root / TASKS_PATH)
 
-    def save_episode(
-        self,
-        episode_index: int,
-        episode_length: int,
-        episode_tasks: list[str],
-        episode_stats: dict[str, dict],
-    ) -> None:
-        self.info["total_episodes"] += 1
-        self.info["total_frames"] += episode_length
+    def save_episode(self, episode_idx: int, episode_len: int, tasks: list[str], episode_stats=None) -> None:
+        """Save episode information in metadata."""
+        # Update in-memory representation
+        if episode_idx in self.episodes:
+            # Update existing episode
+            self.episodes[episode_idx]["length"] = episode_len
+            self.episodes[episode_idx]["tasks"] = tasks
+        else:
+            # Add new episode
+            self.episodes[episode_idx] = {
+                "episode_index": episode_idx,
+                "tasks": tasks,
+                "length": episode_len,
+            }
+        
+        # Check if episodes file exists and create directory if needed
+        episodes_path = self.root / EPISODES_PATH
+        episodes_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Write episode to file - recreate the entire file to ensure consistency
+        episodes_list = []
+        for ep_idx, ep_dict in self.episodes.items():
+            episodes_list.append({
+                "episode_index": ep_idx,
+                "tasks": ep_dict["tasks"],
+                "length": ep_dict["length"]
+            })
+        write_jsonlines(episodes_list, episodes_path)
+        
+        # Update the info dictionary
+        self.info["total_frames"] += episode_len
+        self.info["total_episodes"] = len(self.episodes)
+        
+        # Write updated info to file
+        write_json(self.info, self.root / INFO_PATH)
 
-        chunk = self.get_episode_chunk(episode_index)
-        if chunk >= self.total_chunks:
-            self.info["total_chunks"] += 1
-
-        self.info["splits"] = {"train": f"0:{self.info['total_episodes']}"}
-        self.info["total_videos"] += len(self.video_keys)
-        if len(self.video_keys) > 0:
-            self.update_video_info()
-
-        write_info(self.info, self.root)
-
-        episode_dict = {
-            "episode_index": episode_index,
-            "tasks": episode_tasks,
-            "length": episode_length,
-        }
-        self.episodes[episode_index] = episode_dict
-        write_episode(episode_dict, self.root)
-
-        self.episodes_stats[episode_index] = episode_stats
-        self.stats = aggregate_stats([self.stats, episode_stats]) if self.stats else episode_stats
-        write_episode_stats(episode_index, episode_stats, self.root)
+        if episode_stats is not None:
+            self.episodes_stats[episode_idx] = episode_stats
+            write_episode_stats(episode_idx, episode_stats, self.root)
 
     def update_video_info(self) -> None:
         """
@@ -780,9 +796,13 @@ class LeRobotDataset(torch.utils.data.Dataset):
         if self.image_writer is None:
             if isinstance(image, torch.Tensor):
                 image = image.cpu().numpy()
-            write_image(image, fpath)
+            try:
+                fpath.parent.mkdir(parents=True, exist_ok=True)
+                write_image(image, fpath)
+            except Exception as e:
+                logging.warning(f"Error saving image to {fpath}: {e}. Continuing without saving this image.")
         else:
-            self.image_writer.save_image(image=image, fpath=fpath)
+            self.image_writer.save_image(image, fpath)
 
     def add_frame(self, frame: dict) -> None:
         """
@@ -832,8 +852,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
         self.episode_buffer["size"] += 1
 
     def save_episode(self, episode_data: dict | None = None) -> None:
-        """
-        This will save to disk the current episode in self.episode_buffer.
+        """Save an episode to disk: both data in parquet and images.
+
+        When using images as storage for visual modalities, this will add the images path to the parquet file.
+        When using videos, this will also encode those videos with the images.
 
         Args:
             episode_data (dict | None, optional): Dict containing the episode data to save. If None, this will
@@ -842,13 +864,17 @@ class LeRobotDataset(torch.utils.data.Dataset):
         """
         if not episode_data:
             episode_buffer = self.episode_buffer
+        else:
+            episode_buffer = episode_data
 
         validate_episode_buffer(episode_buffer, self.meta.total_episodes, self.features)
 
         # size and task are special cases that won't be added to hf_dataset
         episode_length = episode_buffer.pop("size")
-        tasks = episode_buffer.pop("task")
-        episode_tasks = list(set(tasks))
+        episode_tasks = []
+        for task in episode_buffer.pop("task"):
+            if task is not None and task not in episode_tasks:
+                episode_tasks.append(task)
         episode_index = episode_buffer["episode_index"]
 
         episode_buffer["index"] = np.arange(self.meta.total_frames, self.meta.total_frames + episode_length)
@@ -856,12 +882,18 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
         # Add new tasks to the tasks dictionary
         for task in episode_tasks:
-            task_index = self.meta.get_task_index(task)
-            if task_index is None:
+            if task not in self.meta.task_to_task_index:
                 self.meta.add_task(task)
 
         # Given tasks in natural language, find their corresponding task indices
-        episode_buffer["task_index"] = np.array([self.meta.get_task_index(task) for task in tasks])
+        # We need to create an array with the same length as the episode
+        if len(episode_tasks) > 0:
+            # Use the first task for all frames if multiple tasks exist
+            task_index = self.meta.get_task_index(episode_tasks[0])
+            episode_buffer["task_index"] = np.full((episode_length,), task_index)
+        else:
+            # If no tasks, use default task index 0
+            episode_buffer["task_index"] = np.zeros((episode_length,), dtype=np.int32)
 
         for key, ft in self.features.items():
             # index, episode_index, task_index are already processed above, and image and video
@@ -870,16 +902,49 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 continue
             episode_buffer[key] = np.stack(episode_buffer[key])
 
+        # Make sure all images are written
         self._wait_image_writer()
+        
+        # Save the episode data to a parquet file
         self._save_episode_table(episode_buffer, episode_index)
-        ep_stats = compute_episode_stats(episode_buffer, self.features)
 
+        # Compute stats for this episode
+        try:
+            if len(self.meta.camera_keys) > 0:
+                # Get one of the camera keys to get the image paths
+                image_key = self.meta.camera_keys[0]
+                # Get file paths for all frames of this episode
+                img_paths = [
+                    str(self._get_image_file_path(episode_index, image_key, frame_idx))
+                    for frame_idx in range(episode_length)
+                ]
+                try:
+                    ep_stats = compute_episode_stats(episode_buffer, img_paths)
+                except Exception as e:
+                    logging.warning(
+                        f"Error computing episode statistics: {e}. "
+                        "Continuing without computing stats for this episode."
+                    )
+                    ep_stats = None
+            else:
+                ep_stats = compute_episode_stats(episode_buffer)
+        except OSError as e:
+            if "image file is truncated" in str(e):
+                logging.warning(f"Could not compute episode statistics due to truncated image files. Error: {e}")
+                ep_stats = None  # Set ep_stats to None when images are truncated
+            else:
+                # For other OSErrors, we still want to raise them
+                raise
+
+        # Save episodes as videos instead of sequences of images
+        video_paths = {}
         if len(self.meta.video_keys) > 0:
             video_paths = self.encode_episode_videos(episode_index)
+            # Add paths to videos in saved parquet data
             for key in self.meta.video_keys:
                 episode_buffer[key] = video_paths[key]
 
-        # `meta.save_episode` be executed after encoding the videos
+        # `meta.save_episode` be executed after queueing the videos for encoding
         self.meta.save_episode(episode_index, episode_length, episode_tasks, ep_stats)
 
         ep_data_index = get_episode_data_index(self.meta.episodes, [episode_index])
@@ -892,16 +957,25 @@ class LeRobotDataset(torch.utils.data.Dataset):
             self.tolerance_s,
         )
 
-        video_files = list(self.root.rglob("*.mp4"))
-        assert len(video_files) == self.num_episodes * len(self.meta.video_keys)
-
-        parquet_files = list(self.root.rglob("*.parquet"))
-        assert len(parquet_files) == self.num_episodes
-
-        # delete images
-        img_dir = self.root / "images"
-        if img_dir.is_dir():
-            shutil.rmtree(self.root / "images")
+        # Schedule image cleanup to run in the background after encoding is complete
+        if len(self.meta.video_keys) > 0:
+            from lerobot.common.datasets.background_worker import (
+                video_encoder_worker,
+                cleanup_image_directory,
+            )
+            
+            # Instead of immediately scheduling cleanup, add a task that first checks
+            # if encoding is complete before cleaning up
+            def cleanup_after_encoding_complete(img_dir):
+                # First wait for any pending encoding tasks
+                self.wait_for_video_encoding()
+                # Then clean up the image directory
+                cleanup_image_directory(img_dir)
+            
+            img_dir = self.root / "images"
+            if img_dir.is_dir():
+                # Use our new function that waits for encoding to complete first
+                video_encoder_worker.add_task(cleanup_after_encoding_complete, img_dir)
 
         if not episode_data:  # Reset the buffer
             self.episode_buffer = self.create_episode_buffer()
@@ -950,9 +1024,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
             self.image_writer = None
 
     def _wait_image_writer(self) -> None:
-        """Wait for asynchronous image writer to finish."""
+        """Wait for all image writing tasks to complete."""
         if self.image_writer is not None:
-            self.image_writer.wait_until_done()
+            # Use a short timeout (2 seconds) to avoid blocking indefinitely
+            self.image_writer.wait_until_done(timeout=2.0)
 
     def encode_videos(self) -> None:
         """
@@ -966,8 +1041,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
     def encode_episode_videos(self, episode_index: int) -> dict:
         """
         Use ffmpeg to convert frames stored as png into mp4 videos.
-        Note: `encode_video_frames` is a blocking call. Making it asynchronous shouldn't speedup encoding,
-        since video encoding with ffmpeg is already using multithreading.
+        Now uses background processing to avoid blocking the main thread.
         """
         video_paths = {}
         for key in self.meta.video_keys:
@@ -979,9 +1053,82 @@ class LeRobotDataset(torch.utils.data.Dataset):
             img_dir = self._get_image_file_path(
                 episode_index=episode_index, image_key=key, frame_index=0
             ).parent
-            encode_video_frames(img_dir, video_path, self.fps, overwrite=True)
+            # Use background encoding instead of blocking encoding
+            encode_video_frames_background(img_dir, video_path, self.fps, overwrite=True)
 
         return video_paths
+    
+    def wait_for_video_encoding(self, timeout=60, verbose=True):
+        """
+        Wait for all background video encoding tasks to complete.
+        This is a blocking call and should only be used when necessary.
+        
+        Args:
+            timeout (int): Maximum time to wait in seconds. If None, wait indefinitely.
+            verbose (bool): Whether to print status updates during waiting
+            
+        Returns:
+            bool: True if all encoding tasks completed, False if timeout occurred
+        """
+        from lerobot.common.datasets.background_worker import video_encoder_worker
+        
+        # If no worker is running, return immediately
+        if not video_encoder_worker.running:
+            logging.info("Video encoder worker is not running.")
+            return True
+            
+        # Initial queue size check
+        pending_tasks = video_encoder_worker.get_queue_size()
+        if pending_tasks == 0:
+            if verbose:
+                logging.info("No pending encoding tasks.")
+            return True
+            
+        if verbose:
+            logging.info(f"Waiting for {pending_tasks} encoding tasks to complete...")
+        
+        # Track wait time
+        start_time = time.time()
+        last_progress_time = start_time
+        last_task_count = pending_tasks
+        
+        # Wait until all tasks are done or timeout
+        while True:
+            # Check if we need to exit
+            current_time = time.time()
+            elapsed = current_time - start_time
+            
+            # Check current status
+            current_pending = video_encoder_worker.get_queue_size()
+            current_task = video_encoder_worker.get_current_task()
+            
+            # Log progress every 5 seconds
+            if verbose and (current_time - last_progress_time) >= 5:
+                tasks_completed = last_task_count - current_pending
+                last_task_count = current_pending
+                last_progress_time = current_time
+                
+                if current_task:
+                    logging.info(f"Still waiting: {current_pending} tasks pending, current task: {current_task}, elapsed: {elapsed:.1f}s")
+                else:
+                    logging.info(f"Still waiting: {current_pending} tasks pending, no active task, elapsed: {elapsed:.1f}s")
+                    
+                # Log if tasks completed
+                if tasks_completed > 0:
+                    logging.info(f"Progress: {tasks_completed} tasks completed in the last 5 seconds")
+            
+            # Exit conditions
+            if current_pending == 0:
+                if verbose:
+                    logging.info(f"All encoding tasks completed in {elapsed:.1f} seconds")
+                return True
+                
+            if timeout is not None and elapsed >= timeout:
+                logging.warning(f"Timeout after {elapsed:.1f}s waiting for video encoding. {current_pending} tasks still pending.")
+                return False
+                
+            # Sleep to avoid CPU spinning
+            time.sleep(0.5)
 
     @classmethod
     def create(

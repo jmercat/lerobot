@@ -28,6 +28,7 @@ import cv2
 import torch
 from deepdiff import DeepDiff
 from termcolor import colored
+import numpy as np
 
 from lerobot.common.datasets.image_writer import safe_stop_image_writer
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
@@ -187,27 +188,51 @@ def warmup_record(
     )
 
 
-def record_episode(
-    robot,
-    dataset,
-    events,
-    episode_time_s,
-    display_cameras,
-    policy,
-    fps,
-    single_task,
-):
-    control_loop(
-        robot=robot,
-        control_time_s=episode_time_s,
-        display_cameras=display_cameras,
-        dataset=dataset,
-        events=events,
-        policy=policy,
-        fps=fps,
-        teleoperate=policy is None,
-        single_task=single_task,
+def display_status_overlay(image, text, duration=1.0):
+    """
+    Add a text overlay to an image.
+    
+    Args:
+        image: The camera image to overlay text on (numpy array)
+        text: Text to display
+        duration: How long the text should be visible in seconds
+    
+    Returns:
+        The image with text overlay
+    """
+    # Don't modify the original image
+    overlay_img = image.copy()
+    
+    # Calculate text dimensions for proper positioning
+    h, w = overlay_img.shape[:2]
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.8
+    thickness = 2
+    text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+    
+    # Position text in the top center
+    x = (w - text_size[0]) // 2
+    y = text_size[1] + 20  # Margin from top
+    
+    # Draw semi-transparent background for text
+    sub_img = overlay_img[y-text_size[1]-10:y+10, x-10:x+text_size[0]+10]
+    white_rect = np.ones(sub_img.shape, dtype=np.uint8) * 0
+    overlay_img[y-text_size[1]-10:y+10, x-10:x+text_size[0]+10] = cv2.addWeighted(
+        sub_img, 0.5, white_rect, 0.5, 0
     )
+    
+    # Draw text
+    cv2.putText(
+        overlay_img, 
+        text, 
+        (x, y), 
+        font, 
+        font_scale, 
+        (0, 255, 0),  # Green text
+        thickness
+    )
+    
+    return overlay_img
 
 
 @safe_stop_image_writer
@@ -221,6 +246,7 @@ def control_loop(
     policy: PreTrainedPolicy = None,
     fps: int | None = None,
     single_task: str | None = None,
+    status_message: str = None,
 ):
     # TODO(rcadene): Add option to record logs
     if not robot.is_connected:
@@ -240,6 +266,15 @@ def control_loop(
 
     if dataset is not None and fps is not None and dataset.fps != fps:
         raise ValueError(f"The dataset fps should be equal to requested fps ({dataset['fps']} != {fps}).")
+
+    # Variables to track status display
+    status_start_time = None
+    status_duration = 1.0  # How long to display status messages, in seconds
+    
+    # If a status message is provided, set its start time
+    if status_message:
+        status_start_time = time.perf_counter()
+        logging.info(f"Status: {status_message}")
 
     timestamp = 0
     start_episode_t = time.perf_counter()
@@ -267,7 +302,20 @@ def control_loop(
         if display_cameras and not is_headless():
             image_keys = [key for key in observation if "image" in key]
             for key in image_keys:
-                cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+                img = observation[key].numpy()
+                
+                # Add overlay text if there's an active status message
+                if status_message and status_start_time is not None:
+                    current_time = time.perf_counter()
+                    # Check if the status message should still be displayed
+                    if current_time - status_start_time < status_duration:
+                        img = display_status_overlay(img, status_message, status_duration)
+                    else:
+                        # Clear status after duration expires
+                        status_message = None
+                        status_start_time = None
+                        
+                cv2.imshow(key, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
             cv2.waitKey(1)
 
         if fps is not None:
@@ -283,17 +331,42 @@ def control_loop(
             break
 
 
-def reset_environment(robot, events, reset_time_s, fps):
-    # TODO(rcadene): refactor warmup_record and reset_environment
+def reset_environment(robot, events, reset_time_s, fps, display_cameras=False):
+    # Ensure the robot stops following the leader arm
     if has_method(robot, "teleop_safety_stop"):
         robot.teleop_safety_stop()
-
+    
+    # For SO100 robots, explicitly stop movement
+    if robot.robot_type.lower() == 'so100' and hasattr(robot, 'stop_following_leader'):
+        robot.stop_following_leader()
+    
+    # Force mode to stop if possible
+    if hasattr(robot, 'set_control_mode'):
+        robot.set_control_mode('position')  # Switch to position mode to stop
+    
+    # Send zero velocities if possible
+    if hasattr(robot, 'follower_arms') and robot.follower_arms:
+        for arm_name, arm in robot.follower_arms.items():
+            if hasattr(arm, 'write') and 'Goal_Velocity' in arm.motors:
+                try:
+                    # Try to set velocities to zero
+                    zeros = [0.0] * len(arm.motors['Goal_Velocity'])
+                    arm.write('Goal_Velocity', zeros)
+                except Exception as e:
+                    logging.warning(f"Failed to set zero velocities: {e}")
+    
+    # Let the robot settle for a moment
+    time.sleep(0.1)
+    
+    # Now allow manual teleoperation during reset
     control_loop(
         robot=robot,
         control_time_s=reset_time_s,
         events=events,
         fps=fps,
         teleoperate=True,
+        display_cameras=display_cameras,
+        status_message="Reset Time - Position Robot",
     )
 
 
@@ -345,3 +418,32 @@ def sanity_check_dataset_robot_compatibility(
         raise ValueError(
             "Dataset metadata compatibility check failed with mismatches:\n" + "\n".join(mismatches)
         )
+
+
+def record_episode(
+    robot,
+    dataset,
+    events,
+    episode_time_s,
+    display_cameras,
+    policy,
+    fps,
+    single_task,
+    episode_number=None,
+):
+    status_message = None
+    if episode_number is not None:
+        status_message = f"Recording Episode {episode_number}"
+    
+    control_loop(
+        robot=robot,
+        control_time_s=episode_time_s,
+        display_cameras=display_cameras,
+        dataset=dataset,
+        events=events,
+        policy=policy,
+        fps=fps,
+        teleoperate=policy is None,
+        single_task=single_task,
+        status_message=status_message,
+    )

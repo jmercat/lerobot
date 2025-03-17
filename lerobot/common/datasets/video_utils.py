@@ -280,6 +280,54 @@ def encode_video_frames(
         )
 
 
+def encode_video_frames_background(
+    imgs_dir: Path | str,
+    video_path: Path | str,
+    fps: int,
+    **kwargs
+) -> None:
+    """
+    Queue a video encoding task to be processed in the background.
+    
+    Args:
+        imgs_dir: Directory containing image frames
+        video_path: Output video file path
+        fps: Frames per second
+        **kwargs: Additional arguments to pass to encode_video_frames
+    """
+    from lerobot.common.datasets.background_worker import video_encoder_worker
+    
+    # Create a placeholder file to indicate encoding is in progress
+    video_path = Path(video_path)
+    video_path.parent.mkdir(parents=True, exist_ok=True)
+    placeholder_path = video_path.with_suffix('.encoding')
+    placeholder_path.touch()
+    
+    # Add the encoding task to the background queue
+    video_encoder_worker.add_task(
+        encode_video_frames,
+        imgs_dir=imgs_dir,
+        video_path=video_path,
+        fps=fps,
+        **kwargs
+    )
+
+
+def wait_for_video_encoding_completion():
+    """
+    Wait for all queued video encoding tasks to complete.
+    This is a blocking call and should only be used when necessary.
+    """
+    from lerobot.common.datasets.background_worker import video_encoder_worker
+    
+    # If no worker is running, return immediately
+    if not video_encoder_worker.running:
+        return
+    
+    # Wait for all tasks to complete
+    video_encoder_worker.queue.join()
+
+
 @dataclass
 class VideoFrame:
     # TODO(rcadene, lhoestq): move to Hugging Face `datasets` repo

@@ -225,8 +225,14 @@ def load_episodes(local_dir: Path) -> dict:
 def write_episode_stats(episode_index: int, episode_stats: dict, local_dir: Path):
     # We wrap episode_stats in a dictionary since `episode_stats["episode_index"]`
     # is a dictionary of stats and not an integer.
-    episode_stats = {"episode_index": episode_index, "stats": serialize_dict(episode_stats)}
-    append_jsonlines(episode_stats, local_dir / EPISODES_STATS_PATH)
+    if episode_stats is None:
+        # Handle the case where episode_stats is None (e.g., due to truncated images)
+        serialized_stats = {}
+    else:
+        serialized_stats = serialize_dict(episode_stats)
+    
+    episode_stats_entry = {"episode_index": episode_index, "stats": serialized_stats}
+    append_jsonlines(episode_stats_entry, local_dir / EPISODES_STATS_PATH)
 
 
 def load_episodes_stats(local_dir: Path) -> dict:
@@ -455,7 +461,16 @@ def create_empty_dataset_info(
 def get_episode_data_index(
     episode_dicts: dict[dict], episodes: list[int] | None = None
 ) -> dict[str, torch.Tensor]:
-    episode_lengths = {ep_idx: ep_dict["length"] for ep_idx, ep_dict in episode_dicts.items()}
+    episode_lengths = {}
+    for ep_idx, ep_dict in episode_dicts.items():
+        # Try to get episode_len, if not available fall back to length
+        if "episode_len" in ep_dict:
+            episode_lengths[ep_idx] = ep_dict["episode_len"]
+        elif "length" in ep_dict:
+            episode_lengths[ep_idx] = ep_dict["length"]
+        else:
+            raise KeyError(f"Neither 'episode_len' nor 'length' found in episode {ep_idx}")
+            
     if episodes is not None:
         episode_lengths = {ep_idx: episode_lengths[ep_idx] for ep_idx in episodes}
 

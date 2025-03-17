@@ -17,10 +17,13 @@ import multiprocessing
 import queue
 import threading
 from pathlib import Path
+import time
 
 import numpy as np
 import PIL.Image
 import torch
+import multiprocessing as mp
+from queue import Empty
 
 
 def safe_stop_image_writer(func):
@@ -118,33 +121,30 @@ class AsyncImageWriter:
     the number of threads. If it is still not stable, try to use 1 subprocess, or more.
     """
 
-    def __init__(self, num_processes: int = 0, num_threads: int = 1):
-        self.num_processes = num_processes
+    def __init__(self, num_processes: int = 0, num_threads: int = 4):
         self.num_threads = num_threads
-        self.queue = None
-        self.threads = []
+        self.num_processes = num_processes
+        self.queue = queue.Queue()
         self.processes = []
-        self._stopped = False
+        self.threads = []
+        self._graceful_shutdown = True
+        self._start()
 
-        if num_threads <= 0 and num_processes <= 0:
-            raise ValueError("Number of threads and processes must be greater than zero.")
-
-        if self.num_processes == 0:
-            # Use threading
-            self.queue = queue.Queue()
-            for _ in range(self.num_threads):
-                t = threading.Thread(target=worker_thread_loop, args=(self.queue,))
-                t.daemon = True
-                t.start()
-                self.threads.append(t)
-        else:
-            # Use multiprocessing
-            self.queue = multiprocessing.JoinableQueue()
-            for _ in range(self.num_processes):
-                p = multiprocessing.Process(target=worker_process, args=(self.queue, self.num_threads))
-                p.daemon = True
+    def _start(self):
+        if self.num_processes > 0:
+            for i in range(self.num_processes):
+                p = mp.Process(
+                    target=worker_process,
+                    args=(self.queue, self.num_threads // self.num_processes),
+                    daemon=True,
+                )
                 p.start()
                 self.processes.append(p)
+        else:
+            for i in range(self.num_threads):
+                t = threading.Thread(target=worker_thread_loop, args=(self.queue,), daemon=True)
+                t.start()
+                self.threads.append(t)
 
     def save_image(self, image: torch.Tensor | np.ndarray | PIL.Image.Image, fpath: Path):
         if isinstance(image, torch.Tensor):
@@ -152,27 +152,58 @@ class AsyncImageWriter:
             image = image.cpu().numpy()
         self.queue.put((image, fpath))
 
-    def wait_until_done(self):
-        self.queue.join()
+    def wait_until_done(self, timeout=None):
+        """
+        Wait until all image writing tasks are completed.
+        
+        Args:
+            timeout (float, optional): Maximum time to wait in seconds.
+                                     If None, wait indefinitely.
+        
+        Returns:
+            bool: True if all tasks completed, False if timeout occurred.
+        """
+        if not self._graceful_shutdown:
+            # Don't wait if we're not doing a graceful shutdown
+            return True
+            
+        try:
+            # Use a timeout to avoid blocking indefinitely
+            wait_start = time.time()
+            while not self.queue.empty():
+                if timeout is not None and time.time() - wait_start > timeout:
+                    return False
+                time.sleep(0.1)
+            self.queue.join()
+            return True
+        except KeyboardInterrupt:
+            # Handle user interruption by falling back to non-graceful shutdown
+            print("KeyboardInterrupt received while waiting for image writer. "
+                  "Switching to immediate shutdown.")
+            self.stop(graceful=False)
+            return False
 
-    def stop(self):
-        if self._stopped:
-            return
-
-        if self.num_processes == 0:
-            for _ in self.threads:
-                self.queue.put(None)
-            for t in self.threads:
-                t.join()
-        else:
-            num_nones = self.num_processes * self.num_threads
-            for _ in range(num_nones):
-                self.queue.put(None)
-            for p in self.processes:
-                p.join()
-                if p.is_alive():
-                    p.terminate()
-            self.queue.close()
-            self.queue.join_thread()
-
-        self._stopped = True
+    def stop(self, graceful=True):
+        """
+        Stop the image writer.
+        
+        Args:
+            graceful (bool): If True, wait for all queued tasks to complete.
+                             If False, terminate immediately, discarding pending tasks.
+        """
+        self._graceful_shutdown = graceful
+        
+        if not graceful:
+            # Clear the queue to prevent waiting on join
+            while not self.queue.empty():
+                try:
+                    self.queue.get_nowait()
+                    self.queue.task_done()
+                except Empty:
+                    break
+        
+        for p in self.processes:
+            p.terminate()
+            p.join(timeout=0.5)
+        self.processes = []
+        self.threads = []

@@ -305,6 +305,8 @@ class FeetechMotorsBus:
         self.logs = {}
 
         self.track_positions = {}
+        self.last_positions = {}  # Track last positions to detect wrap-around
+        self.position_offsets = {}  # Accumulated offsets from wrap-around
 
     def connect(self):
         if self.is_connected:
@@ -778,6 +780,17 @@ class FeetechMotorsBus:
         ts_utc_name = get_log_name("timestamp_utc", "read", data_name, motor_names)
         self.logs[ts_utc_name] = capture_timestamp_utc()
 
+        # Apply wrap-around handling for position readings
+        if data_name == "Present_Position":
+            if motor_names is None:
+                # Handle all motors
+                for idx, val in enumerate(values):
+                    mid = self.motor_names[idx]
+                    values[idx] = self.handle_position_wrap_around(mid, val)
+            else:
+                # Handle single motor
+                values = self.handle_position_wrap_around(motor_names[0], values)
+
         return values
 
     def write_with_motor_ids(self, motor_models, motor_ids, data_name, values, num_retry=NUM_WRITE_RETRY):
@@ -896,3 +909,62 @@ class FeetechMotorsBus:
     def __del__(self):
         if getattr(self, "is_connected", False):
             self.disconnect()
+
+    def handle_position_wrap_around(self, motor_id, position):
+        """Handle position wrap-around by tracking jumps.
+        
+        Args:
+            motor_id: ID of the motor
+            position: Position value or array of position values
+            
+        Returns:
+            Corrected position value(s)
+        """
+        encoder_min = 0
+        encoder_max = 4095  # For 12-bit encoder
+        wrap_threshold = 2000  # Large jump threshold
+        
+        # Check if position is an array
+        if isinstance(position, (list, np.ndarray)):
+            # Initialize arrays if needed
+            if motor_id not in self.last_positions:
+                self.last_positions[motor_id] = np.array(position)
+                self.position_offsets[motor_id] = np.zeros_like(position)
+                return position
+            
+            last_pos = self.last_positions[motor_id]
+            diff = np.array(position) - last_pos
+            
+            # Apply wrap-around detection element-wise
+            high_to_low = diff > wrap_threshold
+            low_to_high = diff < -wrap_threshold
+            
+            # Update offsets where wrap-around is detected
+            if np.any(high_to_low):
+                self.position_offsets[motor_id][high_to_low] -= (encoder_max + 1)
+            if np.any(low_to_high):
+                self.position_offsets[motor_id][low_to_high] += (encoder_max + 1)
+            
+            # Update last positions
+            self.last_positions[motor_id] = np.array(position)
+            
+            # Return corrected positions
+            return np.array(position) + self.position_offsets[motor_id]
+        else:
+            # Original single-value logic
+            if motor_id not in self.last_positions:
+                self.last_positions[motor_id] = position
+                self.position_offsets[motor_id] = 0
+                return position
+            
+            last_pos = self.last_positions[motor_id]
+            diff = position - last_pos
+            
+            # Detect wrap-around
+            if diff > wrap_threshold:  # Wrapped from high to low
+                self.position_offsets[motor_id] -= (encoder_max + 1)
+            elif diff < -wrap_threshold:  # Wrapped from low to high
+                self.position_offsets[motor_id] += (encoder_max + 1)
+            
+            self.last_positions[motor_id] = position
+            return position + self.position_offsets[motor_id]

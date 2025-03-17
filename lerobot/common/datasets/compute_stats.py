@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
+import logging
 
 from lerobot.common.datasets.utils import load_image_as_numpy
 
@@ -54,22 +55,33 @@ def auto_downsample_height_width(img: np.ndarray, target_size: int = 150, max_si
     return img[:, ::downsample_factor, ::downsample_factor]
 
 
-def sample_images(image_paths: list[str]) -> np.ndarray:
-    sampled_indices = sample_indices(len(image_paths))
+def sample_images(data):
+    """Data is a list of image paths."""
+    if len(data) == 0:
+        return None
 
-    images = None
-    for i, idx in enumerate(sampled_indices):
-        path = image_paths[idx]
-        # we load as uint8 to reduce memory usage
-        img = load_image_as_numpy(path, dtype=np.uint8, channel_first=True)
-        img = auto_downsample_height_width(img)
+    # Sample up to 100 images at random to compute statistics
+    if len(data) > 100:
+        indices = np.random.choice(len(data), 100, replace=False)
+        subset = [data[i] for i in indices]
+    else:
+        subset = data
 
-        if images is None:
-            images = np.empty((len(sampled_indices), *img.shape), dtype=np.uint8)
-
-        images[i] = img
-
-    return images
+    images = []
+    for path in subset:
+        try:
+            img = load_image_as_numpy(path, dtype=np.uint8, channel_first=True)
+            images.append(img)
+        except Exception as e:
+            logging.warning(f"Error loading image from {path}: {e}. Skipping this image for stats computation.")
+    
+    # If no images could be loaded, return None
+    if not images:
+        logging.warning("No valid images could be loaded for stats computation. Skipping stats for this episode.")
+        return None
+        
+    # Compute statistics on loaded images
+    return np.stack(images)
 
 
 def get_feature_stats(array: np.ndarray, axis: tuple, keepdims: bool) -> dict[str, np.ndarray]:

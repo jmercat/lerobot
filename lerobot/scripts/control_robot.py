@@ -160,11 +160,13 @@ from lerobot.common.robot_devices.control_utils import (
     sanity_check_dataset_robot_compatibility,
     stop_recording,
     warmup_record,
+    is_headless,
 )
 from lerobot.common.robot_devices.robots.utils import Robot, make_robot_from_config
 from lerobot.common.robot_devices.utils import busy_wait, safe_disconnect
 from lerobot.common.utils.utils import has_method, init_logging, log_say
 from lerobot.configs import parser
+import cv2
 
 ########################################################################################
 # Control modes
@@ -286,52 +288,96 @@ def record(
         robot.teleop_safety_stop()
 
     recorded_episodes = 0
-    while True:
-        if recorded_episodes >= cfg.num_episodes:
-            break
+    try:
+        while True:
+            if recorded_episodes >= cfg.num_episodes:
+                break
 
-        log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
-        record_episode(
-            robot=robot,
-            dataset=dataset,
-            events=events,
-            episode_time_s=cfg.episode_time_s,
-            display_cameras=cfg.display_cameras,
-            policy=policy,
-            fps=cfg.fps,
-            single_task=cfg.single_task,
-        )
+            # Show the episode number we're about to record, not the count of already recorded ones
+            log_say(f"Recording episode {recorded_episodes}", cfg.play_sounds)
+            try:
+                record_episode(
+                    robot=robot,
+                    dataset=dataset,
+                    events=events,
+                    episode_time_s=cfg.episode_time_s,
+                    display_cameras=cfg.display_cameras,
+                    policy=policy,
+                    fps=cfg.fps,
+                    single_task=cfg.single_task,
+                    episode_number=recorded_episodes,
+                )
+                # Ensure episode is saved after recording
+                dataset.save_episode()
+                # Wait for video encoding to complete before continuing
+                dataset.wait_for_video_encoding(timeout=30, verbose=True)
+            except KeyboardInterrupt:
+                # Handle interrupt during recording by saving partial episode
+                log_say("Recording interrupted, saving partial episode", cfg.play_sounds)
+                # Try to save what we have, but don't block if it's taking too long
+                try:
+                    dataset.save_episode()
+                    # Wait for video encoding to complete before continuing
+                    dataset.wait_for_video_encoding(timeout=30, verbose=True)
+                except Exception as e:
+                    logging.error(f"Error saving episode: {e}")
+                events["stop_recording"] = True
+                break
 
-        # Execute a few seconds without recording to give time to manually reset the environment
-        # Current code logic doesn't allow to teleoperate during this time.
-        # TODO(rcadene): add an option to enable teleoperation during reset
-        # Skip reset for the last episode to be recorded
-        if not events["stop_recording"] and (
-            (recorded_episodes < cfg.num_episodes - 1) or events["rerecord_episode"]
-        ):
-            log_say("Reset the environment", cfg.play_sounds)
-            reset_environment(robot, events, cfg.reset_time_s, cfg.fps)
+            # Execute a few seconds without recording to give time to manually reset the environment
+            # Current code logic doesn't allow to teleoperate during this time.
+            # TODO(rcadene): add an option to enable teleoperation during reset
+            # Skip reset for the last episode to be recorded
+            if not events["stop_recording"] and (
+                (recorded_episodes < cfg.num_episodes - 1) or events["rerecord_episode"]
+            ):
+                log_say("Reset the environment", cfg.play_sounds)
+                try:
+                    reset_environment(robot, events, cfg.reset_time_s, cfg.fps, display_cameras=cfg.display_cameras)
+                except KeyboardInterrupt:
+                    # Handle interrupt during reset
+                    log_say("Reset interrupted", cfg.play_sounds)
+                    events["stop_recording"] = True
+                    break
 
-        if events["rerecord_episode"]:
-            log_say("Re-record episode", cfg.play_sounds)
-            events["rerecord_episode"] = False
-            events["exit_early"] = False
-            dataset.clear_episode_buffer()
-            continue
+            if events["rerecord_episode"]:
+                log_say("Re-record episode", cfg.play_sounds)
+                events["rerecord_episode"] = False
+                events["exit_early"] = False
+                dataset.clear_episode_buffer()
+                continue
 
-        dataset.save_episode()
-        recorded_episodes += 1
+            if events["stop_recording"]:
+                log_say("Stop recording", cfg.play_sounds)
+                break
 
-        if events["stop_recording"]:
-            break
+            recorded_episodes += 1
+            # Prepare for the next episode with an incremented episode index
+            dataset.episode_buffer = dataset.create_episode_buffer(dataset.meta.total_episodes)
+    except Exception as e:
+        logging.error(f"Error during recording: {e}")
+        raise
+    finally:
+        # Always ensure image writer is shutdown properly, with non-graceful stop
+        # to prevent blocking on exit
+        if hasattr(dataset, 'image_writer') and dataset.image_writer is not None:
+            dataset.image_writer.stop(graceful=False)
+        
+        # Stop the keyboard listener
+        if listener is not None:
+            listener.stop()
+        
+        # Close any open windows
+        if cfg.display_cameras and not is_headless():
+            cv2.destroyAllWindows()
 
-    log_say("Stop recording", cfg.play_sounds, blocking=True)
-    stop_recording(robot, listener, cfg.display_cameras)
+    if listener is not None:
+        listener.stop()
 
-    if cfg.push_to_hub:
-        dataset.push_to_hub(tags=cfg.tags, private=cfg.private)
+    if cfg.display_cameras and not is_headless():
+        cv2.destroyAllWindows()
 
-    log_say("Exiting", cfg.play_sounds)
+    robot.disconnect()
     return dataset
 
 
